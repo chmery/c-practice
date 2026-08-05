@@ -9,217 +9,204 @@
 
 #define CANDIDATE_NAME_LENGTH 32
 
-typedef struct {
-  int curr_preference;
-  int valid;
-  char *candidates[];
-} ballot;
-
-typedef struct {
+struct candidate {
   const char *name;
   int votes;
-} candidate;
+};
 
-// typedef struct {
-//   size_t count;
-//   size_t size;
-//   void *items;
-// } array;
+struct ballot {
+  int curr_preference;
+  int valid;
+  struct candidate **candidates;
+};
 
-// typedef struct {
-//   char *candidates[9];
-//   int count;
-// } eliminated;
+struct voting_results {
+  struct candidate *worst_candidate;
+  struct candidate *best_candidate;
+};
 
-// add eliminated candidate name to array
-// check each ballot's curr_preference if in eliminated array
-// if yes, increment until not in array
+struct array {
+  size_t count;
+  size_t item_size;
+  void *items;
+};
 
-// eliminated.candidates[eliminated.count] = candidate_name;
-// eliminated.count++;
+struct array new_array(size_t count, size_t item_size) {
+  struct array a = {.count = count, .item_size = item_size, .items = calloc(count, item_size)};
+  return a;
+}
 
-// what if curr_preference++ is enough? most likely it is but not 100% sure
-
-// if all votes invalid segfault
-// if no valid votes return
-
-// void eliminate_candidate(const char *candidate_name, ballot ballots[], int ballot_count) {
-//   printf("eliminating: %s\n", candidate_name);
-//   for (int i = 0; i < ballot_count; i++) {
-//     if (!ballots[i].valid) {
-//       continue;
-//     }
-
-//     if (strcmp(candidate_name, ballots[i].candidates[ballots[i].curr_preference]) == 0) {
-//       ballots[i].curr_preference++;
-//     }
-//   }
-// };
-
-void find_min_max_votes_candidate(candidate candidates[], int candidates_count, candidate *worst, candidate *best) {
-  int min, max = candidates[0].votes;
-
-  for (int i = 0; i < candidates_count; i++) {
-    if (candidates[i].votes < min) {
-      min = candidates[i].votes;
-    } else if (candidates[i].votes > max) {
-      max = candidates[i].votes;
-    }
+struct candidate *candidates_at(struct array *array, int i) {
+  if (!i) {
+    return (struct candidate *)array->items;
   }
 
-  for (int i = 0; i < candidates_count; i++) {
-    if (candidates[i].votes == min) {
-      *worst = candidates[i];
-    } else if (candidates[i].votes == max) {
-      *best = candidates[i];
-    }
+  return (struct candidate *)array->items + i;
+}
+
+struct ballot *ballots_at(struct array *array, int i) {
+  if (!i) {
+    return (struct ballot *)array->items;
+  }
+
+  return (struct ballot *)array->items + i;
+}
+
+void init_candidates(struct array *candidates, char *argv[]) {
+  for (unsigned i = 0; i < candidates->count; i++) {
+    struct candidate *c = candidates_at(candidates, i);
+    c->name = argv[i + 1];
+    c->votes = 0;
   }
 }
 
-int can_eliminate(candidate candidates[], int candidates_count, int min_votes) {
-  int min_votes_candidates_count = 0;
-  for (int i = 0; i < candidates_count; i++) {
-    if (candidates[i].votes == min_votes) {
-      min_votes_candidates_count++;
+struct candidate *input_to_candidate(char *input, struct array *candidates) {
+  for (unsigned i = 0; i < candidates->count; i++) {
+    struct candidate *c = candidates_at(candidates, i);
+    if (strcmp(input, c->name) == 0) {
+      return c;
     }
   }
 
-  return min_votes_candidates_count == 1;
+  return NULL;
 }
 
-void add_vote_for_candidate(char candidate_name[], candidate candidates[], int candidates_count) {
+int candidate_in_ballot(struct candidate *candidate, struct ballot *ballot, int candidates_count) {
   for (int i = 0; i < candidates_count; i++) {
-    if (strcmp(candidate_name, candidates[i].name) == 0) {
-      candidates[i].votes++;
-      break;
+    if (ballot->candidates[i] && ballot->candidates[i] == candidate) {
+      return 1;
     }
   }
+  return 0;
 }
 
-// void sum_votes(ballot ballots[], candidate candidates[], int ballots_count, int candidates_count) {
-//   for (int i = 0; i < ballots_count; i++) {
-//     ballot b = ballots[i];
-//     if (b.valid) {
-//       add_vote_for_candidate(b.candidates[b.curr_preference], candidates, candidates_count);
-//     }
-//   }
-// }
-
-int is_valid_vote(char *candidate_name, int candidates_count, candidate candidates[], ballot *ballot) {
-  int candidate_exists = 0;
-  int is_duplicate = 0;
-
-  for (int i = 0; i < candidates_count; i++) {
-    if (strcmp(candidate_name, candidates[i].name) == 0) {
-      candidate_exists = 1;
-      break;
-    }
-  }
-
-  for (int i = 0; i < candidates_count; i++) {
-    if (!ballot->candidates[i]) {
-      break;
-    }
-
-    if (strcmp(ballot->candidates[i], candidate_name) == 0) {
-      is_duplicate = 1;
-      break;
-    }
-  }
-
-  return candidate_exists && !is_duplicate;
-}
-
-void clear_votes(candidate candidates[], int candidates_count) {
-  for (int i = 0; i < candidates_count; i++) {
-    candidates[i].votes = 0;
-  }
-}
-
-void init_candidates(candidate candidates[], int candidates_count, char *argv[]) {
-  for (int i = 0; i < candidates_count; i++) {
-    candidates[i].name = argv[i + 1];
-    candidates[i].votes = 0;
-  }
-}
-
-ballot *init_ballots(candidate candidates[], int voters_count, int candidates_count) {
-  size_t ballot_size = sizeof(ballot) + sizeof(char *) * candidates_count;
-  size_t ballots_size = ballot_size * voters_count;
-  ballot *ballots = malloc(ballots_size);
-
-  int invalid_count = 0;
-  for (int i = 0; i < voters_count; i++) {
-    printf("\n");
-
-    size_t step = ballot_size * i / sizeof(ballot);
-    ballot *b = ballots + step;
-    b->curr_preference = 0;
-    b->valid = 1;
-
-    for (int rank = 0; rank < candidates_count; rank++) {
-      char name[CANDIDATE_NAME_LENGTH];
-      printf("rank %i: ", rank + 1);
-      scanf("%s", name);
-
-      if (!is_valid_vote(name, candidates_count, candidates, b)) {
-        printf("invalid vote\n");
-        b->valid = 0;
-        // TODO: experiment with this solution
-        // set pointers addresses to 0
-        // memset(b.candidates[0], 0, CANDIDATE_NAME_LENGTH * candidates_count);
-        invalid_count++;
-        break;
-      }
-
-      b->candidates[rank] = malloc(CANDIDATE_NAME_LENGTH);
-      strcpy(b->candidates[rank], name);
-    }
-  }
-
-  if (invalid_count == voters_count) {
-    return NULL;
-  }
-
-  size_t valid_ballots_size = ballots_size - (ballot_size * invalid_count);
-  ballot *valid_ballots = malloc(valid_ballots_size);
+void filter_out_invalid_ballots(struct array *ballots, int invalid_count) {
+  size_t valid_ballots_count = (sizeof(struct ballot) * (ballots->count - invalid_count)) / sizeof(struct ballot);
+  struct ballot *valid_ballots = calloc(valid_ballots_count, sizeof(struct ballot));
 
   int skipped = 0;
-  for (int i = 0; i < voters_count; i++) {
-    if (ballots[i].valid) {
-      memcpy(&valid_ballots[i - skipped], &ballots[i], ballot_size);
+  for (unsigned i = 0; i < ballots->count; i++) {
+    struct ballot *ballot = ballots_at(ballots, i);
+    if (ballot->valid) {
+      memcpy(&valid_ballots[i - skipped], ballot, sizeof(struct ballot));
     } else {
+      free(ballot->candidates);
       skipped++;
     }
   }
 
-  free(ballots);
-  return valid_ballots;
+  free(ballots->items);
+  ballots->count = valid_ballots_count;
+  ballots->items = valid_ballots;
 }
 
-// const char *find_winner(ballot ballots[], candidate candidates[], int ballots_count, int valid_ballots_count,
-//                         int candidates_count) {
-//   candidate worst_candidate;
-//   candidate best_candidate;
+void init_ballots(struct array *ballots, struct array *candidates, int voters_count) {
+  int invalid_count = 0;
+  for (int i = 0; i < voters_count; i++) {
+    printf("\n");
 
-//   sum_votes(ballots, candidates, ballots_count, candidates_count);
+    struct ballot *ballot = ballots_at(ballots, i);
+    ballot->candidates = calloc(candidates->count, sizeof(struct candidate *));
 
-//   // FIX: it should look for rank1 candidates only
-//   find_min_max_votes_candidate(candidates, candidates_count, &worst_candidate, &best_candidate);
+    for (unsigned rank = 0; rank < candidates->count; rank++) {
+      char name[CANDIDATE_NAME_LENGTH];
+      printf("rank %i: ", rank + 1);
+      scanf("%31s", name);
 
-//   int majority_achieved = (best_candidate.votes / (float)valid_ballots_count) > 0.50;
-//   if (majority_achieved) {
-//     return best_candidate.name;
-//   }
+      struct candidate *candidate = input_to_candidate(name, candidates);
+      int is_invalid = !candidate || candidate_in_ballot(candidate, ballot, candidates->count);
 
-//   if (can_eliminate(candidates, candidates_count, worst_candidate.votes)) {
-//     eliminate_candidate(worst_candidate.name, ballots, ballots_count);
-//     clear_votes(candidates, candidates_count);
-//     return find_winner(ballots, candidates, ballots_count, valid_ballots_count, candidates_count);
-//   }
+      if (is_invalid) {
+        printf("invalid vote\n");
+        invalid_count++;
+        break;
+      }
 
-//   return NULL;
-// };
+      ballot->candidates[rank] = candidate;
+    }
+    ballot->valid = 1;
+  }
+
+  filter_out_invalid_ballots(ballots, invalid_count);
+}
+
+int can_eliminate(struct array *candidates, struct candidate *worst_candidate) {
+  int worst_candidates_count = 0;
+  for (unsigned i = 0; i < candidates->count; i++) {
+    struct candidate *candidate = candidates_at(candidates, i);
+    if (candidate->votes == worst_candidate->votes) {
+      worst_candidates_count++;
+    }
+  }
+  return worst_candidates_count == 1;
+}
+
+void sum_votes(struct array *ballots) {
+  for (unsigned i = 0; i < ballots->count; i++) {
+    struct ballot *b = ballots_at(ballots, i);
+    b->candidates[b->curr_preference]->votes++;
+  }
+}
+
+void clear_votes(struct array *candidates) {
+  for (unsigned i = 0; i < candidates->count; i++) {
+    struct candidate *candidate = candidates_at(candidates, i);
+    candidate->votes = 0;
+  }
+}
+
+void eliminate_candidate(struct candidate *candidate, struct array *ballots) {
+  printf("\neliminating: %s\n", candidate->name);
+
+  for (unsigned i = 0; i < ballots->count; i++) {
+    struct ballot *ballot = ballots_at(ballots, i);
+    if (strcmp(candidate->name, ballot->candidates[ballot->curr_preference]->name) == 0) {
+      ballot->curr_preference++;
+    }
+  }
+}
+
+struct voting_results get_voting_results(struct array *candidates) {
+  struct voting_results results = {0};
+
+  for (unsigned i = 0; i < candidates->count; i++) {
+    struct candidate *candidate = candidates_at(candidates, i);
+    if (!candidate->votes) {
+      continue;
+    }
+
+    if (!results.worst_candidate && !results.best_candidate) {
+      results.worst_candidate = candidate;
+      results.best_candidate = candidate;
+    }
+
+    if (candidate->votes < results.worst_candidate->votes) {
+      results.worst_candidate = candidate;
+    } else if (candidate->votes > results.best_candidate->votes) {
+      results.best_candidate = candidate;
+    }
+  }
+
+  return results;
+}
+
+const char *find_winner(struct array *ballots, struct array *candidates, int candidates_count) {
+  sum_votes(ballots);
+  struct voting_results results = get_voting_results(candidates);
+
+  int majority_achieved = (results.best_candidate->votes / (float)ballots->count) > 0.50;
+  if (majority_achieved) {
+    return results.best_candidate->name;
+  }
+
+  if (can_eliminate(candidates, results.worst_candidate)) {
+    eliminate_candidate(results.worst_candidate, ballots);
+    clear_votes(candidates);
+    return find_winner(ballots, candidates, candidates_count);
+  }
+
+  return NULL;
+}
 
 int main(int argc, char *argv[]) {
   if (argc < 2 || argc > 10) {
@@ -227,7 +214,6 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  // rename to voters_count, ballots_count will differ
   int voters_count = 0;
   printf("voters: ");
   scanf("%i", &voters_count);
@@ -238,26 +224,22 @@ int main(int argc, char *argv[]) {
   }
 
   int candidates_count = argc - 1;
-  candidate candidates[candidates_count];
-  init_candidates(candidates, candidates_count, argv);
-  // array ballots = {0};
-  // (ballot)ballots.items;
+  struct array candidates = new_array(candidates_count, sizeof(struct candidate));
+  struct array ballots = new_array(voters_count, sizeof(struct ballot));
+  init_candidates(&candidates, argv);
+  init_ballots(&ballots, &candidates, voters_count);
 
-  ballot *ballots = init_ballots(candidates, voters_count, candidates_count);
-
-  if (!ballots) {
-    printf("all votes invalid\n");
+  if (!ballots.count) {
+    printf("\nall votes invalid\n");
     return 1;
   }
 
-  // ballots_count = ballots_size / ballot_size;
+  const char *winner = find_winner(&ballots, &candidates, candidates_count);
+  if (winner) {
+    printf("\nwinner: %s\n", winner);
+  } else {
+    printf("\nelection unresolved\n");
+  }
 
-  // const char *winner = find_winner(ballots, candidates, ballots_count, candidates_count);
-  // if (winner) {
-  //   printf("winner: %s\n", winner);
-  // } else {
-  //   printf("election unresolved\n");
-  // }
-
-  // return 0;
+  return 0;
 }
