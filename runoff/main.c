@@ -20,6 +20,13 @@ struct ballot {
   struct candidate **candidates;
 };
 
+// UNION??
+// struct ballots {
+//   size_t count;
+//   size_t item_size;
+//   struct ballot *items;
+// };
+
 struct voting_results {
   struct candidate *worst_candidate;
   struct candidate *best_candidate;
@@ -80,22 +87,32 @@ int candidate_in_ballot(struct candidate *candidate, struct ballot *ballot, int 
   return 0;
 }
 
-void filter_out_invalid_ballots(struct array *ballots, int invalid_count) {
+void free_ballots(struct array *ballots) {
+  for (unsigned i = 0; i < ballots->count; i++) {
+    struct ballot *b = ballots_at(ballots, i);
+    free(b->candidates);
+  }
+  free(ballots->items);
+}
+
+void filter_out_invalid_ballots(struct array *ballots, int candidates_count, int invalid_count) {
   size_t valid_ballots_count = (sizeof(struct ballot) * (ballots->count - invalid_count)) / sizeof(struct ballot);
-  struct ballot *valid_ballots = calloc(valid_ballots_count, sizeof(struct ballot));
+  struct ballot *valid_ballots = calloc(valid_ballots_count, sizeof(*valid_ballots));
 
   int skipped = 0;
   for (unsigned i = 0; i < ballots->count; i++) {
     struct ballot *ballot = ballots_at(ballots, i);
     if (ballot->valid) {
-      memcpy(&valid_ballots[i - skipped], ballot, sizeof(struct ballot));
+      struct ballot *vb = &valid_ballots[i - skipped];
+      vb->valid = 1;
+      vb->candidates = calloc(candidates_count, sizeof(struct candidate *));
+      memcpy(vb->candidates, ballot->candidates, sizeof(struct candidate *) * candidates_count);
     } else {
-      free(ballot->candidates);
       skipped++;
     }
   }
 
-  free(ballots->items);
+  free_ballots(ballots);
   ballots->count = valid_ballots_count;
   ballots->items = valid_ballots;
 }
@@ -106,7 +123,8 @@ void init_ballots(struct array *ballots, struct array *candidates, int voters_co
     printf("\n");
 
     struct ballot *ballot = ballots_at(ballots, i);
-    ballot->candidates = calloc(candidates->count, sizeof(struct candidate *));
+    ballot->candidates = calloc(candidates->count, sizeof(ballot->candidates));
+    ballot->valid = 1;
 
     for (unsigned rank = 0; rank < candidates->count; rank++) {
       char name[CANDIDATE_NAME_LENGTH];
@@ -119,15 +137,15 @@ void init_ballots(struct array *ballots, struct array *candidates, int voters_co
       if (is_invalid) {
         printf("invalid vote\n");
         invalid_count++;
+        ballot->valid = 0;
         break;
       }
 
       ballot->candidates[rank] = candidate;
     }
-    ballot->valid = 1;
   }
 
-  filter_out_invalid_ballots(ballots, invalid_count);
+  filter_out_invalid_ballots(ballots, candidates->count, invalid_count);
 }
 
 int can_eliminate(struct array *candidates, struct candidate *worst_candidate) {
@@ -240,6 +258,9 @@ int main(int argc, char *argv[]) {
   } else {
     printf("\nelection unresolved\n");
   }
+
+  free(candidates.items);
+  free_ballots(&ballots);
 
   return 0;
 }
