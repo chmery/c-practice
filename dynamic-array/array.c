@@ -61,22 +61,28 @@ void remove_from_array(struct array *array, unsigned idx) {
   }
 }
 
-// https://stackoverflow.com/questions/9410/how-do-you-pass-a-function-as-a-parameter-in-c
-// void filter_array(struct array *array, int (*filter_fn)(void *)) {
-//   struct array new_array = create_array(array->length, array->item_size);
+void filter_array(struct array *array, int (*filter_fn)(void *)) {
+  if (!array->length) {
+    exit(EXIT_FAILURE);
+  }
 
-//   for (int i = 0; i < array->length; i++) {
-//     void *item = array_at(array, i);
-//     int matches_condidtion = filter_fn(item);
-//     if (matches_condidtion) {
-//       push_to_array(&new_array, &item);
-//       // push to new
-//     }
-//   }
-// }
+  struct array temp_array = create_array(array->capacity, array->item_size);
+
+  for (unsigned i = 0; i < array->length; i++) {
+    void *item = array_at(array, i);
+    int matches_condidtion = filter_fn(item);
+    if (matches_condidtion) {
+      push_to_array(&temp_array, item);
+    }
+  }
+
+  memcpy(array->items, temp_array.items, temp_array.length * temp_array.item_size);
+  resize_array(array, array->length - temp_array.length, SHRINK);
+  free_array(&temp_array);
+}
 
 void push_to_array(struct array *array, void *item) {
-  unsigned space_left = array->capacity - array->length * array->item_size;
+  size_t space_left = array->capacity - array->length * array->item_size;
 
   if (space_left) {
     void *dest = array_at(array, array->length);

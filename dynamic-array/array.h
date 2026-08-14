@@ -17,3 +17,5 @@ void free_array(struct array *array);
 void remove_from_array(struct array *array, unsigned idx);
 void push_to_array(struct array *array, void *item);
 void *array_at(struct array *array, unsigned idx);
+void resize_array(struct array *array, size_t n, enum resize_action action);
+void filter_array(struct array *array, int (*filter_fn)(void *));
