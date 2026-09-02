@@ -4,7 +4,7 @@
 #include <string.h>
 
 #define MAX_TITLE 256
-#define TABLE_SIZE 4
+#define TABLE_SIZE 3
 
 struct book {
   char title[MAX_TITLE];
@@ -12,6 +12,7 @@ struct book {
 };
 
 struct book_node {
+  struct book_node *prev;
   struct book_node *next;
   struct book *data;
 };
@@ -32,6 +33,7 @@ void insert(struct book_node *table[], struct book *book) {
   struct book_node *new_node = malloc(sizeof(*new_node));
 
   new_node->next = NULL;
+  new_node->prev = NULL;
   new_node->data = book;
 
   if (!table[idx]) {
@@ -42,14 +44,13 @@ void insert(struct book_node *table[], struct book *book) {
       node = node->next;
     }
     node->next = new_node;
+    new_node->prev = node;
   }
 }
 
 void free_table(struct book_node *table[]) {
   for (int i = 0; i < TABLE_SIZE; i++) {
-    if (!table[i]) {
-      continue;
-    } else {
+    if (table[i]) {
       struct book_node *node = table[i];
       do {
         struct book_node *node_to_free = node;
@@ -60,13 +61,13 @@ void free_table(struct book_node *table[]) {
   }
 }
 
-struct book *search(struct book_node *table[], char *title) {
+struct book_node *search(struct book_node *table[], char *title) {
   unsigned idx = hash_title(title);
   struct book_node *node = table[idx];
 
   while (node) {
     if (strcmp(node->data->title, title) == 0) {
-      return node->data;
+      return node;
     }
     node = node->next;
   }
@@ -74,11 +75,42 @@ struct book *search(struct book_node *table[], char *title) {
   return NULL;
 }
 
+void delete(struct book_node *table[], char *title) {
+  unsigned idx = hash_title(title);
+  struct book_node *node = search(table, title);
+
+  if (!node) {
+    return;
+  }
+
+  int not_chained = !node->prev && !node->next;
+  if (not_chained) {
+    table[idx] = 0;
+    free(node);
+    return;
+  }
+
+  if (node->prev) {
+    node->prev->next = node->next;
+  }
+
+  if (node->next) {
+    node->next->prev = node->prev;
+  }
+
+  int is_head_node = table[idx] == node;
+  if (is_head_node) {
+    table[idx] = node->next;
+  }
+
+  free(node);
+}
+
 int main(void) {
   struct book_node *books_table[TABLE_SIZE] = {0};
 
-  struct book one = {"wlaz kotek na plotek i mruga", 2011};
-  struct book two = {"wopa gangam style", 300};
+  struct book one = {"kotek", 2011};
+  struct book two = {"gangam style", 300};
   struct book three = {"expanse", 3333};
   struct book four = {"potop1", 43};
   struct book five = {"potop2", 1999};
@@ -89,19 +121,23 @@ int main(void) {
   insert(books_table, &four);
   insert(books_table, &five);
 
-  struct book *result = search(books_table, "potop2");
+  struct book_node *result = search(books_table, "potop2");
   if (result) {
-    printf("found: %s %i\n\n", result->title, result->year);
+    printf("found: %s %i\n\n", result->data->title, result->data->year);
   }
+
+  delete(books_table, one.title);
+  delete(books_table, "expanse");
+  delete(books_table, four.title);
 
   for (int i = 0; i < TABLE_SIZE; i++) {
     struct book_node *node = books_table[i];
     printf("%i: ", i);
 
     if (node) {
-      printf("%p", (void *)node);
+      printf("%p (%s)", (void *)node, node->data->title);
       while (node->next) {
-        printf(" -> %p", (void *)node->next);
+        printf(" -> %p (%s)", (void *)node->next, node->next->data->title);
         node = node->next;
       }
     } else {
