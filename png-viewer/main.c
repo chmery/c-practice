@@ -26,8 +26,6 @@
 // x bytes of data
 // 4 bytes of crc
 
-#define SIGNATURE_BYTES_COUNT 8
-#define IHDR_BYTES_COUNT 21
 #define FILE_NAME "image.png"
 #define EOF_CHUNK "IEND"
 
@@ -38,14 +36,15 @@ struct chunk {
   int crc;
 };
 
-// todo: compare using AND
-
 int signature_valid(FILE *fptr) {
-  unsigned char bytes[SIGNATURE_BYTES_COUNT] = {0};
-  int bytes_read = fread(bytes, 1, SIGNATURE_BYTES_COUNT, fptr);
+  const int signature_bytes_count = 8;
+  const u_int32_t signature_l_bytes = be32toh(0x89504E47);
+  const u_int32_t signature_r_bytes = be32toh(0x0D0A100A);
 
-  return bytes_read == SIGNATURE_BYTES_COUNT && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E &&
-         bytes[3] == 0x47 && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A;
+  u_int32_t bytes[2] = {0};
+  fread(bytes, signature_bytes_count, 1, fptr);
+
+  return !((bytes[0] ^ (signature_l_bytes)) & (bytes[1] ^ (signature_r_bytes)));
 }
 
 char *type_bytes_to_string(u_int32_t chunk_type_bytes) {
@@ -81,7 +80,7 @@ int main(void) {
     return EXIT_FAILURE;
   }
 
-  // IHDR_chunk_valid
+  // todo: combine IHDR_chunk_valid with signature valid
 
   if (!signature_valid(fptr)) {
     printf("specified file is not a valid png\n");
