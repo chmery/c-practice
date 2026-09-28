@@ -9,6 +9,7 @@
 // todo:
 // print image metadata
 // read IDAT
+// verify CRC
 
 //       Section 12.11.) A decoder can have additional confidence in the
 //       file's integrity if the next eight bytes are an IHDR chunk header
@@ -34,17 +35,22 @@ struct chunk {
   int crc;
 };
 
+void print_bytes(void *value, size_t n) {
+  for (unsigned i = 0; i < n; i++) {
+    printf("%02X ", ((unsigned char *)value)[i]);
+  }
+  printf("\n");
+}
+
 int signature_valid(FILE *fptr) {
   const int signature_bytes_count = 8;
   const u_int32_t signature_l_bytes = be32toh(0x89504E47);
-  const u_int32_t signature_r_bytes = be32toh(0x0D0A100A);
+  const u_int32_t signature_r_bytes = be32toh(0x0D0A1A0A);
 
   u_int32_t bytes[2] = {0};
   fread(bytes, signature_bytes_count, 1, fptr);
 
-  // return bytes[0] == signature_l_bytes && bytes[1] == signature_r_bytes;
-
-  return !((bytes[0] ^ (signature_l_bytes)) & (bytes[1] ^ (signature_r_bytes)));
+  return bytes[0] == signature_l_bytes && bytes[1] == signature_r_bytes;
 }
 
 int ihdr_chunk_valid(struct chunk *ihdr_chunk) {
@@ -103,8 +109,6 @@ int main(void) {
   do {
     chunks_count++;
   } while (strcmp(EOF_CHUNK, read_chunk(fptr)->type));
-
-  printf("chunks count: %i\n", chunks_count);
 
   // int width = (bytes[8] << 24) + (bytes[9] << 16) + (bytes[10] << 8) + bytes[11];
   // int height = (bytes[12] << 24) + (bytes[13] << 16) + (bytes[14] << 8) + bytes[15];
