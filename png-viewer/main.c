@@ -38,6 +38,8 @@ struct chunk {
   int crc;
 };
 
+// todo: compare using AND
+
 int signature_valid(FILE *fptr) {
   unsigned char bytes[SIGNATURE_BYTES_COUNT] = {0};
   int bytes_read = fread(bytes, 1, SIGNATURE_BYTES_COUNT, fptr);
@@ -46,36 +48,31 @@ int signature_valid(FILE *fptr) {
          bytes[3] == 0x47 && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A;
 }
 
-char *get_chunk_type(unsigned char *chunk_rest) {
+char *type_bytes_to_string(u_int32_t chunk_type_bytes) {
   char *type = malloc(4 * sizeof(*type));
 
   for (int i = 0; i < 4; i++) {
-    type[i] = chunk_rest[i];
+    type[i] = ((unsigned char *)&chunk_type_bytes)[i];
   }
 
   return type;
 }
 
-char *read_chunk(FILE *fptr) {
+struct chunk *read_chunk(FILE *fptr) {
   struct chunk *chunk_ptr = malloc(sizeof(*chunk_ptr));
+  u_int32_t chunk_buf[2] = {0}; // store chunk length and type bytes
 
-  int data_len_buf = 0;
-  fread(&data_len_buf, 4, 1, fptr);
-  chunk_ptr->data_len = be32toh(data_len_buf);
-
-  unsigned char type_buf[4] = {0};
-  fread(type_buf, 4, 1, fptr);
-  chunk_ptr->type = get_chunk_type(type_buf);
-
-  int chunk_rest_size = chunk_ptr->data_len + 4;
+  fread(chunk_buf, 8, 1, fptr);
+  chunk_ptr->data_len = be32toh(chunk_buf[0]);
+  chunk_ptr->type = type_bytes_to_string(chunk_buf[1]);
   chunk_ptr->data = malloc(chunk_ptr->data_len);
   fread(chunk_ptr->data, chunk_ptr->data_len, 1, fptr);
   fread(&chunk_ptr->crc, 4, 1, fptr);
 
   printf("%s, data size: %i bytes, total size: %i bytes\n", chunk_ptr->type, chunk_ptr->data_len,
-         4 + 4 + chunk_rest_size);
+         4 + 4 + 4 + chunk_ptr->data_len);
 
-  return chunk_ptr->type;
+  return chunk_ptr;
 }
 
 int main(void) {
@@ -91,11 +88,13 @@ int main(void) {
     return 0;
   }
 
+  // struct chunk *IHDR_chunk = read_chunk(fptr);
+
   int chunks_count = 0;
 
   do {
     chunks_count++;
-  } while (strcmp(EOF_CHUNK, read_chunk(fptr)));
+  } while (strcmp(EOF_CHUNK, read_chunk(fptr)->type));
 
   printf("chunks count: %i\n", chunks_count);
 
