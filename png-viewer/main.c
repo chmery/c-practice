@@ -1,6 +1,9 @@
+// #include <byteswap.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 // IDAT chunks can appear in any order
 
@@ -8,22 +11,15 @@
 // print image metadata
 // read IDAT
 
-#define SIGNATURE_BYTES_COUNT 8
-#define IHDR_BYTES_COUNT 21
-#define FILE_NAME "image.png"
-#define EOF_CHUNK "IEND"
+//       to ensure early detection of common file-transfer problems,
+//       decoders should verify that all eight bytes of the PNG file
+//       signature are correct.  (See Rationale: PNG file signature,
+//       Section 12.11.) A decoder can have additional confidence in the
+//       file's integrity if the next eight bytes are an IHDR chunk header
+//       with the correct chunk length.
 
-// struct chunk_type_code {
-//   char b3;
-//   char b2;
-//   char b1;
-//   char b0;
-// };
-
-// struct chunk {
-//   unsigned data_len;
-//   struct chunk_type_code type_code;
-// }
+// It is strongly recommended that decoders should verify the CRC on
+// each chunk.
 
 // chunk build:
 // 4 bytes uint meaning num of bytes in data
@@ -31,17 +27,35 @@
 // x bytes of data
 // 4 bytes of crc
 
-int is_png(FILE *fptr) {
+#define SIGNATURE_BYTES_COUNT 8
+#define IHDR_BYTES_COUNT 21
+#define FILE_NAME "image.png"
+#define EOF_CHUNK "IEND"
+
+struct chunk {
+  int data_len;
+  char *type;
+  unsigned char *data;
+  int crc;
+};
+
+// todo: check official
+u_int32_t be32toh_mine(u_int32_t big_endian_32bits) {
+  unsigned short right = ((short *)&big_endian_32bits)[1];
+  unsigned short left = ((short *)&big_endian_32bits)[0];
+
+  unsigned short right_swapped = right << 8 | right >> 8;
+  unsigned short left_swapped = left << 8 | left >> 8;
+
+  return right_swapped | left_swapped << 16;
+}
+
+int signature_valid(FILE *fptr) {
   unsigned char bytes[SIGNATURE_BYTES_COUNT] = {0};
   int bytes_read = fread(bytes, 1, SIGNATURE_BYTES_COUNT, fptr);
 
   return bytes_read == SIGNATURE_BYTES_COUNT && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E &&
          bytes[3] == 0x47 && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A;
-}
-
-// convert array of 4 bytes to 4 byte int
-int bytes_to_int(unsigned char bytes[]) {
-  return (bytes[0] << 24) + (bytes[1] << 16) + (bytes[2] << 8) + bytes[3];
 }
 
 char *get_chunk_type(unsigned char *chunk_rest) {
@@ -55,18 +69,25 @@ char *get_chunk_type(unsigned char *chunk_rest) {
 }
 
 char *read_chunk(FILE *fptr) {
-  unsigned char len_bytes[4] = {0};
-  fread(len_bytes, 1, 4, fptr);
-  int data_len = bytes_to_int(len_bytes);
-  int chunk_rest_size = data_len + 4 + 4;
+  struct chunk *chunk_ptr = malloc(sizeof(*chunk_ptr));
 
-  unsigned char *chunk_rest = malloc(chunk_rest_size);
-  fread(chunk_rest, 1, chunk_rest_size, fptr);
+  int data_len_buf = 0;
+  fread(&data_len_buf, 4, 1, fptr);
+  chunk_ptr->data_len = be32toh_mine(data_len_buf);
 
-  char *type = get_chunk_type(chunk_rest);
-  printf("readin: %s, size: %uB\n", type, 4 + chunk_rest_size);
+  unsigned char type_buf[4] = {0};
+  fread(type_buf, 4, 1, fptr);
+  chunk_ptr->type = get_chunk_type(type_buf);
 
-  return type;
+  int chunk_rest_size = chunk_ptr->data_len + 4;
+  chunk_ptr->data = malloc(chunk_ptr->data_len);
+  fread(chunk_ptr->data, chunk_ptr->data_len, 1, fptr);
+  fread(&chunk_ptr->crc, 4, 1, fptr);
+
+  printf("%s, data size: %i bytes, total size: %i bytes\n", chunk_ptr->type, chunk_ptr->data_len,
+         4 + 4 + chunk_rest_size);
+
+  return chunk_ptr->type;
 }
 
 int main(void) {
@@ -75,7 +96,9 @@ int main(void) {
     return EXIT_FAILURE;
   }
 
-  if (!is_png(fptr)) {
+  // IHDR_chunk_valid
+
+  if (!signature_valid(fptr)) {
     printf("specified file is not a valid png\n");
     return 0;
   }
