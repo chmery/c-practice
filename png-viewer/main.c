@@ -10,9 +10,6 @@
 // print image metadata
 // read IDAT
 
-//       to ensure early detection of common file-transfer problems,
-//       decoders should verify that all eight bytes of the PNG file
-//       signature are correct.  (See Rationale: PNG file signature,
 //       Section 12.11.) A decoder can have additional confidence in the
 //       file's integrity if the next eight bytes are an IHDR chunk header
 //       with the correct chunk length.
@@ -28,6 +25,7 @@
 
 #define FILE_NAME "image.png"
 #define EOF_CHUNK "IEND"
+#define IHDR_CHUNK_DATA_LEN 13
 
 struct chunk {
   int data_len;
@@ -44,7 +42,15 @@ int signature_valid(FILE *fptr) {
   u_int32_t bytes[2] = {0};
   fread(bytes, signature_bytes_count, 1, fptr);
 
+  // return bytes[0] == signature_l_bytes && bytes[1] == signature_r_bytes;
+
   return !((bytes[0] ^ (signature_l_bytes)) & (bytes[1] ^ (signature_r_bytes)));
+}
+
+int ihdr_chunk_valid(struct chunk *ihdr_chunk) {
+  int valid_type = strcmp(ihdr_chunk->type, "IHDR") == 0;
+  int valid_len = ihdr_chunk->data_len == IHDR_CHUNK_DATA_LEN;
+  return valid_type && valid_len;
 }
 
 char *type_bytes_to_string(u_int32_t chunk_type_bytes) {
@@ -80,16 +86,19 @@ int main(void) {
     return EXIT_FAILURE;
   }
 
-  // todo: combine IHDR_chunk_valid with signature valid
-
   if (!signature_valid(fptr)) {
     printf("specified file is not a valid png\n");
     return 0;
   }
 
-  // struct chunk *IHDR_chunk = read_chunk(fptr);
+  struct chunk *ihdr_chunk = read_chunk(fptr);
 
-  int chunks_count = 0;
+  if (!ihdr_chunk_valid(ihdr_chunk)) {
+    printf("specified file is not a valid png\n");
+    return 0;
+  }
+
+  int chunks_count = 1;
 
   do {
     chunks_count++;
