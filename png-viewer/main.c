@@ -1,4 +1,3 @@
-// #include <byteswap.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,17 +38,6 @@ struct chunk {
   int crc;
 };
 
-// todo: check official
-u_int32_t be32toh_mine(u_int32_t big_endian_32bits) {
-  unsigned short right = ((short *)&big_endian_32bits)[1];
-  unsigned short left = ((short *)&big_endian_32bits)[0];
-
-  unsigned short right_swapped = right << 8 | right >> 8;
-  unsigned short left_swapped = left << 8 | left >> 8;
-
-  return right_swapped | left_swapped << 16;
-}
-
 int signature_valid(FILE *fptr) {
   unsigned char bytes[SIGNATURE_BYTES_COUNT] = {0};
   int bytes_read = fread(bytes, 1, SIGNATURE_BYTES_COUNT, fptr);
@@ -73,7 +61,7 @@ char *read_chunk(FILE *fptr) {
 
   int data_len_buf = 0;
   fread(&data_len_buf, 4, 1, fptr);
-  chunk_ptr->data_len = be32toh_mine(data_len_buf);
+  chunk_ptr->data_len = be32toh(data_len_buf);
 
   unsigned char type_buf[4] = {0};
   fread(type_buf, 4, 1, fptr);
