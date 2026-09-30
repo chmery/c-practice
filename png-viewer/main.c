@@ -5,36 +5,16 @@
 #include <string.h>
 #include <sys/types.h>
 
-// IDAT chunks can appear in any order
-
-// IHDR
-// 4b width
-// 4b height
-
-// 1b bit depth
-// number of bits used to encode color of a single pixel OR
-// number of bits used for each color component of a single pixel
-// but in png it describes sample or pallete index not single pixel
-
-// Valid values are 1, 2, 4, 8, and 16
-
-// 1b color type
-//  represent sums of the following values: 1 (palette used), 2 (color used),
-//  and 4 (alpha channel used). Valid values are 0, 2, 3, 4, and 6.
-
-// 1b comp // always 0
-// 1b filter // always 0
-// 1b interlace // 0 no 1 yes adam7
+// sRGB standard rgb displaying
+// gAMA This chunk is ignored unless it is the highest-precedence color chunk understood by the decoder.
+// pHYs specifies the intended pixel size or aspect ratio for display of the image
+// it contains px per unit x, px per unit y 4B each, unit specifier 1B
 
 // todo:
-// print image metadata
 // read IDAT
 // verify CRC
 
-//       Section 12.11.) A decoder can have additional confidence in the
-//       file's integrity if the next eight bytes are an IHDR chunk header
-//       with the correct chunk length.
-
+// IDAT chunks can appear in any order
 // It is strongly recommended that decoders should verify the CRC on
 // each chunk.
 
@@ -45,7 +25,7 @@
 
 struct chunk {
   u_int32_t data_len;
-  char *type;
+  char type[5];
   u_int8_t *data;
   u_int32_t crc;
 };
@@ -84,17 +64,6 @@ int ihdr_chunk_valid(struct chunk *ihdr_chunk) {
   return valid_type && valid_len;
 }
 
-char *type_bytes_to_string(u_int32_t chunk_type_bytes) {
-  char *type = malloc(5 * sizeof(*type));
-
-  for (int i = 0; i < 4; i++) {
-    type[i] = ((unsigned char *)&chunk_type_bytes)[i];
-  }
-  type[4] = '\0';
-
-  return type;
-}
-
 struct ihdr_data extract_ihdr_data(struct chunk *chunk) {
   struct ihdr_data data = {0};
 
@@ -106,7 +75,6 @@ struct ihdr_data extract_ihdr_data(struct chunk *chunk) {
 }
 
 void free_chunk(struct chunk *chunk) {
-  free(chunk->type);
   free(chunk->data);
   free(chunk);
 }
@@ -117,7 +85,9 @@ struct chunk *read_chunk(FILE *fptr) {
 
   fread(chunk_buf, 8, 1, fptr);
   chunk_ptr->data_len = be32toh(chunk_buf[0]);
-  chunk_ptr->type = type_bytes_to_string(chunk_buf[1]);
+  memcpy(chunk_ptr->type, &chunk_buf[1], 4);
+  chunk_ptr->type[4] = '\0';
+
   chunk_ptr->data = malloc(chunk_ptr->data_len);
   fread(chunk_ptr->data, chunk_ptr->data_len, 1, fptr);
   fread(&chunk_ptr->crc, 4, 1, fptr);
@@ -140,7 +110,6 @@ int main(void) {
   }
 
   struct chunk *ihdr_chunk = read_chunk(fptr);
-
   if (!ihdr_chunk_valid(ihdr_chunk)) {
     printf("specified file is not a valid png\n");
     return 0;
@@ -152,13 +121,12 @@ int main(void) {
   printf("%ipx x %ipx\ndepth: %i\ncolor: %i\n", header_data.width, header_data.height, header_data.bit_depth,
          header_data.color_type);
 
+  int chunks_count = 1;
+
+  do {
+    chunks_count++;
+  } while (strcmp(EOF_CHUNK, read_chunk(fptr)->type));
+
   fclose(fptr);
-
-  // int chunks_count = 1;
-
-  // do {
-  //   chunks_count++;
-  // } while (strcmp(EOF_CHUNK, read_chunk(fptr)->type));
-
   return 0;
 }
