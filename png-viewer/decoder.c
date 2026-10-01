@@ -13,11 +13,6 @@
 // It is strongly recommended that decoders should verify the CRC on
 // each chunk.
 
-// u_int32_t bytes[2] = {0};
-// int bytes_read = fread(bytes, signature_bytes_count, 1, fptr);
-
-// return bytes_read == signature_bytes_count && bytes[0] == signature_l_bytes && bytes[1] == signature_r_bytes;
-
 int signature_valid(FILE *fptr) {
   const int signature_bytes_count = 8;
   const u_int32_t signature_l_bytes = be32toh(0x89504E47);
@@ -79,6 +74,7 @@ struct chunk *read_chunk(FILE *fptr) {
 struct ihdr_data *read_png_header(char *path) {
   FILE *fptr = fopen(path, "rb");
   if (!fptr) {
+    printf("error occured while opening file at specified path\n");
     return NULL;
   }
 

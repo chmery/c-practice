@@ -14,6 +14,9 @@
 
 int main(void) {
   struct ihdr_data *png_header = read_png_header(FILE_NAME);
+  if (!png_header) {
+    return 0;
+  }
 
   printf("%ipx x %ipx\ndepth: %i\ncolor: %i\n", png_header->width, png_header->height, png_header->bit_depth,
          png_header->color_type);
