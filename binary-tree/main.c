@@ -8,7 +8,6 @@ struct node {
   struct node *right;
 };
 
-// stack behavior can be achieved by recursion
 // int tree[10] = {50, 40, 30, 17, 13, 12, 11, 7, 4, 6};
 
 struct stack {
@@ -42,10 +41,9 @@ struct node *dfs(struct node *root, int value) {
 
   while (s.top > -1) {
     struct node *node = s.nodes[s.top];
-    printf("visited: %i\n", node->data);
+    printf("%i ", node->data);
 
     if (node->data == value) {
-      printf("found value\n");
       free_stack(&s);
       return node;
     }
@@ -65,6 +63,34 @@ struct node *dfs(struct node *root, int value) {
   return NULL;
 }
 
+struct node *dfs_recursive(struct node *root, int value) {
+  printf("%i ", root->data);
+
+  if (root->data == value) {
+    return root;
+  }
+
+  if (!root->left && !root->right) {
+    return NULL;
+  }
+
+  if (root->left) {
+    struct node *result = dfs_recursive(root->left, value);
+    if (result) {
+      return result;
+    }
+  }
+
+  if (root->right) {
+    struct node *result = dfs_recursive(root->right, value);
+    if (result) {
+      return result;
+    }
+  }
+
+  return NULL;
+}
+
 int main(void) {
   struct node l2_child1 = {5, 0, 0};
   struct node l2_child2 = {6, 0, 0};
@@ -73,5 +99,10 @@ int main(void) {
   struct node l1_child2 = {4, 0, &l2_child4};
   struct node root = {2, &l1_child1, &l1_child2};
 
-  struct node *n = dfs(&root, 33);
+  struct node *n = dfs(&root, 3);
+  // struct node *n = dfs_recursive(&root, 3);
+
+  if (n) {
+    printf("\nvalue found: %i\n", n->data);
+  }
 }
