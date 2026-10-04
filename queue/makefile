@@ -1,3 +1,3 @@
-main: main.c 
-	gcc main.c -o main -Wall -Wextra -pedantic -g
-	./main
+nodes: nodes.c 
+	gcc nodes.c -o nodes -Wall -Wextra -pedantic -g
+	./nodes
