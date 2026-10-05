@@ -94,7 +94,7 @@ int main(void) {
 
   FILE *fp = fopen("text.txt", "r");
 
-  dequeue(&requests_queue); // should do nothing
+  dequeue(&requests_queue);
 
   char content[256] = {0};
   int id = 0;
