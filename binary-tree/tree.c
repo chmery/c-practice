@@ -8,8 +8,6 @@ struct node {
   struct node *right;
 };
 
-// int tree[10] = {50, 40, 30, 17, 13, 12, 11, 7, 4, 6};
-
 struct stack {
   int top;
   struct node **nodes;
