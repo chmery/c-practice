@@ -1,38 +1,28 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct heap {
   int size;
   int *elements;
 };
 
-struct heap init_heap() {
-  struct heap h = {0, malloc(sizeof(int) * 50)};
-  return h;
-}
-
-int sift_up(struct heap *h, int value_idx) {
-  int parent_idx = value_idx / 2;
+int sift_up(struct heap *h, int child_idx) {
+  int parent_idx = child_idx / 2;
   if (parent_idx == 0) {
     return 0;
   }
 
   int parent_value = h->elements[parent_idx];
-  int value = h->elements[value_idx];
+  int child_value = h->elements[child_idx];
 
-  if (value < parent_value) {
-    h->elements[parent_idx] = value;
-    h->elements[value_idx] = parent_value;
+  if (child_value < parent_value) {
+    h->elements[parent_idx] = child_value;
+    h->elements[child_idx] = parent_value;
     return sift_up(h, parent_idx);
   }
 
   return 0;
-}
-
-void insert(struct heap *h, int value) {
-  h->size++;
-  h->elements[h->size] = value;
-  sift_up(h, h->size);
 }
 
 int sift_down(struct heap *h, int parent_idx) {
@@ -43,6 +33,10 @@ int sift_down(struct heap *h, int parent_idx) {
 
   int left_child_idx = 2 * parent_idx;
   int right_child_idx = 2 * parent_idx + 1;
+
+  if (right_child_idx > h->size) {
+    right_child_idx = left_child_idx;
+  }
 
   int parent_value = h->elements[parent_idx];
   int left_child_value = h->elements[left_child_idx];
@@ -58,6 +52,27 @@ int sift_down(struct heap *h, int parent_idx) {
   }
 
   return 0;
+}
+
+void heapify(struct heap *h) {
+  int first_non_leaf_idx = h->size / 2;
+  for (int i = first_non_leaf_idx; i > 0; i--) {
+    sift_down(h, i);
+  }
+}
+
+struct heap init_heap(int arr[], int size) {
+  struct heap h = {size, malloc(sizeof(int) * (size + 1))};
+  h.elements[0] = 0;
+  memcpy(&h.elements[1], arr, sizeof(int) * size);
+  heapify(&h);
+  return h;
+}
+
+void insert(struct heap *h, int value) {
+  h->size++;
+  h->elements[h->size] = value;
+  sift_up(h, h->size);
 }
 
 int delete(struct heap *h) {
@@ -88,17 +103,12 @@ void print_heap(struct heap *h) {
 }
 
 int main(void) {
-  struct heap h = init_heap();
-
-  int to_insert[] = {7, 4, 4, 1, 15, 2, 8};
-  for (int i = 0; i < 7; i++) {
-    insert(&h, to_insert[i]);
-  }
-
+  int arr[] = {5, 8, 9, 10, 2, 3};
+  struct heap h = init_heap(arr, 6);
   print_heap(&h);
   heap_sort(&h);
 
-  for (int i = 1; i < 8; i++) {
+  for (int i = 1; i < 7; i++) {
     printf("[%i] ", h.elements[i]);
   }
   printf("\n");
