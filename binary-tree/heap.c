@@ -1,11 +1,7 @@
+#include "heap.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-struct heap {
-  int size;
-  int *elements;
-};
 
 int sift_up(struct heap *h, int child_idx) {
   int parent_idx = child_idx / 2;
@@ -13,12 +9,12 @@ int sift_up(struct heap *h, int child_idx) {
     return 0;
   }
 
-  int parent_value = h->elements[parent_idx];
-  int child_value = h->elements[child_idx];
+  struct heap_node parent = h->nodes[parent_idx];
+  struct heap_node child = h->nodes[child_idx];
 
-  if (child_value < parent_value) {
-    h->elements[parent_idx] = child_value;
-    h->elements[child_idx] = parent_value;
+  if (child.weight < parent.weight) {
+    h->nodes[parent_idx] = child;
+    h->nodes[child_idx] = parent;
     return sift_up(h, parent_idx);
   }
 
@@ -26,7 +22,7 @@ int sift_up(struct heap *h, int child_idx) {
 }
 
 int sift_down(struct heap *h, int parent_idx) {
-  int is_leaf_node = parent_idx > h->size / 2;
+  int is_leaf_node = parent_idx > h->len / 2;
   if (is_leaf_node) {
     return 0;
   }
@@ -34,20 +30,20 @@ int sift_down(struct heap *h, int parent_idx) {
   int left_child_idx = 2 * parent_idx;
   int right_child_idx = 2 * parent_idx + 1;
 
-  if (right_child_idx > h->size) {
+  if (right_child_idx > h->len) {
     right_child_idx = left_child_idx;
   }
 
-  int parent_value = h->elements[parent_idx];
-  int left_child_value = h->elements[left_child_idx];
-  int right_child_value = h->elements[right_child_idx];
+  struct heap_node parent = h->nodes[parent_idx];
+  struct heap_node left_child = h->nodes[left_child_idx];
+  struct heap_node right_child = h->nodes[right_child_idx];
 
-  int smaller_child_idx = left_child_value < right_child_value ? left_child_idx : right_child_idx;
-  int smaller_child_value = h->elements[smaller_child_idx];
+  int smaller_child_idx = left_child.weight < right_child.weight ? left_child_idx : right_child_idx;
+  struct heap_node smaller_child_node = h->nodes[smaller_child_idx];
 
-  if (smaller_child_value < parent_value) {
-    h->elements[parent_idx] = smaller_child_value;
-    h->elements[smaller_child_idx] = parent_value;
+  if (smaller_child_node.weight < parent.weight) {
+    h->nodes[parent_idx] = smaller_child_node;
+    h->nodes[smaller_child_idx] = parent;
     sift_down(h, smaller_child_idx);
   }
 
@@ -55,64 +51,63 @@ int sift_down(struct heap *h, int parent_idx) {
 }
 
 void heapify(struct heap *h) {
-  int first_non_leaf_idx = h->size / 2;
+  int first_non_leaf_idx = h->len / 2;
   for (int i = first_non_leaf_idx; i > 0; i--) {
     sift_down(h, i);
   }
 }
 
-struct heap init_heap(int arr[], int size) {
-  struct heap h = {size, malloc(sizeof(int) * (size + 1))};
-  h.elements[0] = 0;
-  memcpy(&h.elements[1], arr, sizeof(int) * size);
+struct heap init_min_heap(struct heap_node nodes[], int len) {
+  struct heap h = {len, malloc(sizeof(struct heap_node) * (len + 1))};
+  memcpy(&h.nodes[1], nodes, sizeof(struct heap_node) * len);
   heapify(&h);
   return h;
 }
 
-void insert(struct heap *h, int value) {
-  h->size++;
-  h->elements[h->size] = value;
-  sift_up(h, h->size);
+void min_heap_insert(struct heap *h, struct heap_node node) {
+  h->len++;
+  h->nodes[h->len] = node;
+  sift_up(h, h->len);
 }
 
-int delete(struct heap *h) {
-  int deleted_element = h->elements[1];
+struct heap_node min_heap_delete(struct heap *h) {
+  struct heap_node deleted_node = h->nodes[1];
 
-  h->elements[1] = h->elements[h->size];
-  h->size--;
+  h->nodes[1] = h->nodes[h->len];
+  h->len--;
   sift_down(h, 1);
 
-  return deleted_element;
+  return deleted_node;
 }
 
-void heap_sort(struct heap *h) {
-  int init_size = h->size;
+void min_heap_sort(struct heap *h) {
+  int init_size = h->len;
   for (int i = 0; i < init_size; i++) {
-    int deleted = delete(h);
-    h->elements[h->size + 1] = deleted;
+    struct heap_node deleted = min_heap_delete(h);
+    h->nodes[h->len + 1] = deleted;
   }
 }
 
 void print_heap(struct heap *h) {
   printf("\n");
-  printf("hsize: %i\n", h->size);
-  for (int i = 1; i <= h->size; i++) {
-    printf("[%i] ", h->elements[i]);
+  printf("hsize: %i\n", h->len);
+  for (int i = 1; i <= h->len; i++) {
+    printf("[%i] ", h->nodes[i].weight);
   }
   printf("\n");
 }
 
-int main(void) {
-  int arr[] = {5, 8, 9, 10, 2, 3};
-  struct heap h = init_heap(arr, 6);
-  print_heap(&h);
-  heap_sort(&h);
+// int main(void) {
+//   struct heap_node nodes[] = {5, NULL, 8, NULL, 9, NULL, 10, NULL, 2, NULL, 3, NULL};
+//   struct heap h = init_min_heap(nodes, 6);
+//   print_heap(&h);
+//   min_heap_sort(&h);
 
-  for (int i = 1; i < 7; i++) {
-    printf("[%i] ", h.elements[i]);
-  }
-  printf("\n");
+//   for (int i = 1; i < 7; i++) {
+//     printf("[%i] ", h.nodes[i].weight);
+//   }
+//   printf("\n");
 
-  free(h.elements);
-  return 0;
-}
+//   free(h.nodes);
+//   return 0;
+// }
