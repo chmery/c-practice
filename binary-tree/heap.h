@@ -1,9 +1,7 @@
 
-// i need to be able to store custom objects in heap elements array
-// caller should pass array of heap elements
 struct heap_node {
   int weight;
-  void *data; // ptr to caller custom object
+  int data;
 };
 
 struct heap {

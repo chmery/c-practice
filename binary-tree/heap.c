@@ -57,7 +57,7 @@ void heapify(struct heap *h) {
   }
 }
 
-struct heap init_min_heap(struct heap_node nodes[], int len) {
+struct heap min_heap_init(struct heap_node nodes[], int len) {
   struct heap h = {len, malloc(sizeof(struct heap_node) * (len + 1))};
   memcpy(&h.nodes[1], nodes, sizeof(struct heap_node) * len);
   heapify(&h);
@@ -92,7 +92,7 @@ void print_heap(struct heap *h) {
   printf("\n");
   printf("hsize: %i\n", h->len);
   for (int i = 1; i <= h->len; i++) {
-    printf("[%i] ", h->nodes[i].weight);
+    printf("[w:%i d:%i] ", h->nodes[i].weight, h->nodes[i].data);
   }
   printf("\n");
 }

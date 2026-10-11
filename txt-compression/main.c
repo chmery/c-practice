@@ -1,3 +1,4 @@
+#include "../binary-tree/heap.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,83 +7,69 @@
 #define CHUNK_SIZE 1024 * 64
 #define ASCII_SIZE 128
 
-struct frequency_node {
-  char ascii_code;
-  int count;
-};
-
-int create_frequency_nodes(struct frequency_node **nodes, int frequencies[]) {
-  size_t max_size = ASCII_SIZE * sizeof(struct frequency_node);
-  struct frequency_node *fnptr = malloc(max_size);
+int create_heap_nodes(struct heap_node **nodes, int char_counts[]) {
+  size_t max_size = ASCII_SIZE * sizeof(struct heap_node);
+  struct heap_node *nodes_ptr = malloc(max_size);
 
   int skipped = 0;
   for (int i = 0; i < ASCII_SIZE; i++) {
-    int count = frequencies[i];
+    int char_count = char_counts[i];
     int insert_idx = i - skipped;
-    if (count) {
-      fnptr[insert_idx].ascii_code = i;
-      fnptr[insert_idx].count = count;
+    char ascii_code = i;
+
+    if (char_count) {
+      nodes_ptr[insert_idx].weight = char_count;
+      nodes_ptr[insert_idx].data = ascii_code;
     } else {
       skipped++;
     }
   }
 
   if (skipped == ASCII_SIZE) {
-    free(fnptr);
+    free(nodes_ptr);
     return 0;
   }
 
   int nodes_count = ASCII_SIZE - skipped;
-  int new_size = max_size - nodes_count * sizeof(struct frequency_node);
-  struct frequency_node *new_fnptr = realloc(fnptr, new_size);
-  if (!new_fnptr) {
+  int new_size = max_size - nodes_count * sizeof(struct heap_node);
+  struct heap_node *new_nodes_ptr = realloc(nodes_ptr, new_size);
+  if (!new_nodes_ptr) {
     return 0;
   }
 
-  *nodes = new_fnptr;
+  *nodes = new_nodes_ptr;
   return nodes_count;
 }
 
-void aggregate_frequencies(int frequencies[], FILE *fptr) {
+void aggregate_char_counts(int char_counts[], FILE *fptr) {
   char buf[CHUNK_SIZE] = {0};
 
   while (!feof(fptr)) {
     size_t bytes_read = fread(buf, 1, CHUNK_SIZE, fptr);
     for (size_t i = 0; i < bytes_read; i++) {
-      frequencies[(int)buf[i]]++;
+      char_counts[(int)buf[i]]++;
     }
-  }
-}
-
-void print_frequencies(int frequencies[]) {
-  for (int i = 0; i < ASCII_SIZE; i++) {
-    if (frequencies[i]) {
-      printf("\"%c\": %i\n", i, frequencies[i]);
-    }
-  }
-}
-
-void print_frequency_nodes(struct frequency_node *nodes, int len) {
-  for (int i = 0; i < len; i++) {
-    printf("\"%c\": %i\n", nodes[i].ascii_code, nodes[i].count);
   }
 }
 
 int main(void) {
-  int frequencies[ASCII_SIZE] = {0};
+  int char_counts[ASCII_SIZE] = {0};
   FILE *fptr = fopen("raw.txt", "rb");
-  aggregate_frequencies(frequencies, fptr);
+  aggregate_char_counts(char_counts, fptr);
 
   if (ferror(fptr)) {
     printf("error\n");
+  } else {
+    fclose(fptr);
   }
 
-  struct frequency_node *nodes = 0;
-  int nodes_count = create_frequency_nodes(&nodes, frequencies);
-  print_frequency_nodes(nodes, nodes_count);
+  struct heap_node *nodes = 0;
+  int nodes_count = create_heap_nodes(&nodes, char_counts);
+  struct heap h = min_heap_init(nodes, nodes_count);
+  print_heap(&h);
 
   free(nodes);
-  fclose(fptr);
+  free(h.nodes);
 
   return 0;
 }
