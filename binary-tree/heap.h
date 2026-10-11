@@ -9,8 +9,13 @@ struct heap {
   struct heap_node *nodes;
 };
 
-struct heap min_heap_init(struct heap_node nodes[], int len);
-void min_heap_insert(struct heap *h, struct heap_node node);
-struct heap_node min_heap_delete(struct heap *h);
-void min_heap_sort(struct heap *h);
-void print_heap(struct heap *h);
+enum heap_type {
+  MIN,
+  MAX
+};
+
+struct heap heap_init(struct heap_node nodes[], int len, enum heap_type ht);
+void heap_insert(struct heap *h, struct heap_node node, enum heap_type ht);
+struct heap_node heap_delete(struct heap *h, enum heap_type ht);
+void heap_sort(struct heap *h, enum heap_type ht);
+void heap_print(struct heap *h);
