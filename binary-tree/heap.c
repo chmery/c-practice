@@ -83,6 +83,7 @@ void heap_insert(struct heap *h, struct heap_node node, enum heap_type ht) {
   sift_up(h, h->len, ht);
 }
 
+// TODO: feature to delete more than just 1 if we want maybe?
 struct heap_node heap_delete(struct heap *h, enum heap_type ht) {
   struct heap_node deleted_node = h->nodes[1];
 
@@ -91,6 +92,17 @@ struct heap_node heap_delete(struct heap *h, enum heap_type ht) {
   sift_down(h, 1, ht);
 
   return deleted_node;
+}
+
+void heap_free(struct heap *h) {
+  for (int i = 1; i <= h->len; i++) {
+    void *data_ptr = h->nodes[i].data;
+    if (data_ptr) {
+      free(data_ptr);
+    }
+  }
+
+  free(h->nodes);
 }
 
 void heap_sort(struct heap *h, enum heap_type ht) {
@@ -105,7 +117,7 @@ void heap_print(struct heap *h) {
   printf("\n");
   printf("hsize: %i\n", h->len);
   for (int i = 1; i <= h->len; i++) {
-    printf("[w:%i d:%i] ", h->nodes[i].weight, h->nodes[i].data);
+    printf("[%i] ", h->nodes[i].weight);
   }
   printf("\n");
 }
@@ -121,6 +133,7 @@ void heap_print(struct heap *h) {
 //   }
 //   printf("\n");
 
-//   free(h.nodes);
+//   heap_free(&h);
+
 //   return 0;
 // }

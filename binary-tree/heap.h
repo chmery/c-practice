@@ -1,7 +1,7 @@
 
 struct heap_node {
   int weight;
-  int data;
+  void *data;
 };
 
 struct heap {
@@ -19,3 +19,4 @@ void heap_insert(struct heap *h, struct heap_node node, enum heap_type ht);
 struct heap_node heap_delete(struct heap *h, enum heap_type ht);
 void heap_sort(struct heap *h, enum heap_type ht);
 void heap_print(struct heap *h);
+void heap_free(struct heap *h);
