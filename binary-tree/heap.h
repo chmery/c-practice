@@ -1,4 +1,3 @@
-
 struct heap_node {
   int weight;
   void *data;

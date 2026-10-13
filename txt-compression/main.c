@@ -7,7 +7,32 @@
 #define CHUNK_SIZE 1024 * 64
 #define ASCII_SIZE 128
 
-int create_heap_nodes(struct heap_node **nodes, int char_counts[]) {
+struct huffman_node {
+  char ascii_code;
+  struct huffman_node *left;
+  struct huffman_node *right;
+};
+
+void print_huffman_tree(struct huffman_node *root) {
+  printf("%i ", root->ascii_code);
+
+  if (!root->left && !root->right) {
+    free(root);
+    return;
+  }
+
+  if (root->left) {
+    print_huffman_tree(root->left);
+  }
+
+  if (root->right) {
+    print_huffman_tree(root->right);
+  }
+
+  free(root);
+}
+
+int counts_to_heap_nodes(struct heap_node **nodes, int char_counts[]) {
   size_t max_size = ASCII_SIZE * sizeof(struct heap_node);
   struct heap_node *nodes_ptr = malloc(max_size);
 
@@ -19,7 +44,11 @@ int create_heap_nodes(struct heap_node **nodes, int char_counts[]) {
 
     if (char_count) {
       nodes_ptr[insert_idx].weight = char_count;
-      nodes_ptr[insert_idx].data = ascii_code;
+      struct huffman_node *hn = malloc(sizeof(*hn));
+      hn->ascii_code = ascii_code;
+      hn->left = NULL;
+      hn->right = NULL;
+      nodes_ptr[insert_idx].data = hn;
     } else {
       skipped++;
     }
@@ -52,24 +81,42 @@ void aggregate_char_counts(int char_counts[], FILE *fptr) {
   }
 }
 
+struct huffman_node *create_huffman_tree(struct heap *priority_queue) {
+  while (priority_queue->len > 1) {
+    struct heap_node smallest1 = heap_delete(priority_queue, MIN);
+    struct heap_node smallest2 = heap_delete(priority_queue, MIN);
+
+    struct huffman_node *hn = malloc(sizeof(*hn));
+    hn->ascii_code = 0;
+    hn->left = smallest1.data;
+    hn->right = smallest2.data;
+    struct heap_node sum_node = {smallest1.weight + smallest2.weight, hn};
+    heap_insert(priority_queue, sum_node, MIN);
+  }
+
+  return heap_delete(priority_queue, MIN).data;
+}
+
 int main(void) {
   int char_counts[ASCII_SIZE] = {0};
   FILE *fptr = fopen("raw.txt", "rb");
   aggregate_char_counts(char_counts, fptr);
 
   if (ferror(fptr)) {
-    printf("error\n");
+    printf("file error\n");
   } else {
     fclose(fptr);
   }
 
-  struct heap_node *nodes = 0;
-  int nodes_count = create_heap_nodes(&nodes, char_counts);
-  struct heap h = min_heap_init(nodes, nodes_count);
-  print_heap(&h);
+  struct heap_node *queue_nodes = 0;
+  int queue_nodes_count = counts_to_heap_nodes(&queue_nodes, char_counts);
+  struct heap priority_queue = heap_init(queue_nodes, queue_nodes_count, MIN);
+  free(queue_nodes);
 
-  free(nodes);
-  free(h.nodes);
+  struct huffman_node *root_node = create_huffman_tree(&priority_queue);
+  print_huffman_tree(root_node);
+
+  heap_free(&priority_queue);
 
   return 0;
 }
