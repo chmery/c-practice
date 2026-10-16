@@ -13,8 +13,38 @@ struct huffman_node {
   struct huffman_node *right;
 };
 
-void print_huffman_tree(struct huffman_node *root) {
-  printf("%i ", root->ascii_code);
+struct codes_table_item {
+  char ascii_code;
+  char huffman_code;
+  char code_len;
+};
+
+void print_huffman_code(struct codes_table_item table_item) {
+  int code_len = table_item.code_len;
+  int code = table_item.huffman_code;
+
+  for (int i = 0; i < code_len; i++) {
+    printf("%i", (code >> (code_len - 1 - i)) & 1);
+  }
+}
+
+void print_huffman_table(struct codes_table_item table[]) {
+  for (int i = 0; i < ASCII_SIZE; i++) {
+    if (!table[i].ascii_code) {
+      continue;
+    }
+
+    printf("idx: %i char: '%c' code: ", i, table[i].ascii_code);
+    print_huffman_code(table[i]);
+    printf("\n");
+  }
+}
+
+void fill_huffman_table(struct huffman_node *root, struct codes_table_item table[], int depth, int code) {
+  if (root->ascii_code) {
+    struct codes_table_item table_item = {root->ascii_code, code, depth};
+    table[(int)root->ascii_code] = table_item;
+  }
 
   if (!root->left && !root->right) {
     free(root);
@@ -22,11 +52,13 @@ void print_huffman_tree(struct huffman_node *root) {
   }
 
   if (root->left) {
-    print_huffman_tree(root->left);
+    // add 0 to code
+    fill_huffman_table(root->left, table, depth + 1, code << 1);
   }
 
   if (root->right) {
-    print_huffman_tree(root->right);
+    // add 1 to code
+    fill_huffman_table(root->right, table, depth + 1, (code << 1) + 1);
   }
 
   free(root);
@@ -70,6 +102,7 @@ int counts_to_heap_nodes(struct heap_node **nodes, int char_counts[]) {
   return nodes_count;
 }
 
+// TODO: get file size
 void aggregate_char_counts(int char_counts[], FILE *fptr) {
   char buf[CHUNK_SIZE] = {0};
 
@@ -114,7 +147,9 @@ int main(void) {
   free(queue_nodes);
 
   struct huffman_node *root_node = create_huffman_tree(&priority_queue);
-  print_huffman_tree(root_node);
+  struct codes_table_item huffman_table[ASCII_SIZE] = {0};
+  fill_huffman_table(root_node, huffman_table, 0, 0);
+  print_huffman_table(huffman_table);
 
   heap_free(&priority_queue);
 
