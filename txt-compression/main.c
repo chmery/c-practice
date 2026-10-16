@@ -1,4 +1,5 @@
 #include "../binary-tree/heap.h"
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,13 +14,13 @@ struct huffman_node {
   struct huffman_node *right;
 };
 
-struct codes_table_item {
+struct huffman_table_item {
   char ascii_code;
   char huffman_code;
   char code_len;
 };
 
-void print_huffman_code(struct codes_table_item table_item) {
+void print_huffman_code(struct huffman_table_item table_item) {
   int code_len = table_item.code_len;
   int code = table_item.huffman_code;
 
@@ -28,7 +29,7 @@ void print_huffman_code(struct codes_table_item table_item) {
   }
 }
 
-void print_huffman_table(struct codes_table_item table[]) {
+void print_huffman_table(struct huffman_table_item table[]) {
   for (int i = 0; i < ASCII_SIZE; i++) {
     if (!table[i].ascii_code) {
       continue;
@@ -40,9 +41,23 @@ void print_huffman_table(struct codes_table_item table[]) {
   }
 }
 
-void fill_huffman_table(struct huffman_node *root, struct codes_table_item table[], int depth, int code) {
+size_t calc_encoded_data_size(int char_counts[], struct huffman_table_item huffman_table[]) {
+  float bits = 0;
+
+  for (int i = 0; i < ASCII_SIZE; i++) {
+    if (!char_counts[i]) {
+      continue;
+    }
+
+    bits += (int)huffman_table[i].code_len * char_counts[i];
+  }
+
+  return ceilf(bits / 8);
+}
+
+void fill_huffman_table(struct huffman_node *root, struct huffman_table_item table[], int depth, int code) {
   if (root->ascii_code) {
-    struct codes_table_item table_item = {root->ascii_code, code, depth};
+    struct huffman_table_item table_item = {root->ascii_code, code, depth};
     table[(int)root->ascii_code] = table_item;
   }
 
@@ -147,9 +162,12 @@ int main(void) {
   free(queue_nodes);
 
   struct huffman_node *root_node = create_huffman_tree(&priority_queue);
-  struct codes_table_item huffman_table[ASCII_SIZE] = {0};
+  struct huffman_table_item huffman_table[ASCII_SIZE] = {0};
   fill_huffman_table(root_node, huffman_table, 0, 0);
   print_huffman_table(huffman_table);
+
+  size_t encoded_data_size = calc_encoded_data_size(char_counts, huffman_table);
+  printf("%zu\n", encoded_data_size);
 
   heap_free(&priority_queue);
 
