@@ -42,7 +42,14 @@ void print_huffman_table(struct huffman_table_item table[]) {
   }
 }
 
-size_t calc_encoded_data_size(int char_counts[], struct huffman_table_item huffman_table[]) {
+void print_encoded_text(uint8_t *text, size_t size) {
+  for (size_t i = 0; i < size; i++) {
+    printf("%x ", text[i]);
+  }
+  printf("\n");
+}
+
+size_t calc_encoded_text_size(int char_counts[], struct huffman_table_item huffman_table[]) {
   float bits = 0;
 
   for (int i = 0; i < ASCII_SIZE; i++) {
@@ -88,7 +95,7 @@ int counts_to_heap_nodes(struct heap_node **nodes, int char_counts[]) {
   for (int i = 0; i < ASCII_SIZE; i++) {
     int char_count = char_counts[i];
     int insert_idx = i - skipped;
-    char ascii_code = i;
+    int ascii_code = i;
 
     if (char_count) {
       nodes_ptr[insert_idx].weight = char_count;
@@ -120,12 +127,12 @@ int counts_to_heap_nodes(struct heap_node **nodes, int char_counts[]) {
 
 // TODO: get file size
 void aggregate_char_counts(int char_counts[], FILE *fptr) {
-  char buf[CHUNK_SIZE] = {0};
+  uint8_t buf[CHUNK_SIZE] = {0};
 
   while (!feof(fptr)) {
     size_t bytes_read = fread(buf, 1, CHUNK_SIZE, fptr);
     for (size_t i = 0; i < bytes_read; i++) {
-      char_counts[(int)buf[i]]++;
+      char_counts[buf[i]]++;
     }
   }
 }
@@ -150,18 +157,16 @@ void write_code_into_bytes(uint8_t *bytes, int *byte_idx, int *start_bit, int co
       *start_bit = *start_bit - code_len;
     }
   } else {
-    // write as much into current byte and apply whats left to the next bytes
+    int truncated_code_len = code_len - *start_bit;
+    int truncated_code = get_n_last_bits(truncated_code_len, code);
 
-    int code_len_left_to_write = code_len - *start_bit;
-    int code_left_to_write = get_n_last_bits(code_len_left_to_write, code);
-
-    uint8_t write_mask = code >> code_len_left_to_write;
+    uint8_t write_mask = code >> truncated_code_len;
     bytes[*byte_idx] = bytes[*byte_idx] | write_mask;
 
     *start_bit = 8;
     (*byte_idx)++;
 
-    write_code_into_bytes(bytes, byte_idx, start_bit, code_left_to_write, code_len_left_to_write);
+    write_code_into_bytes(bytes, byte_idx, start_bit, truncated_code, truncated_code_len);
   }
 }
 
@@ -194,7 +199,8 @@ struct huffman_node *create_huffman_tree(struct heap *priority_queue) {
     heap_insert(priority_queue, sum_node, MIN);
   }
 
-  return heap_delete(priority_queue, MIN).data;
+  struct huffman_node *root_node = heap_delete(priority_queue, MIN).data;
+  return root_node;
 }
 
 int main(void) {
@@ -217,17 +223,13 @@ int main(void) {
   fill_huffman_table(root_node, huffman_table, 0, 0);
   print_huffman_table(huffman_table);
 
-  size_t encoded_data_size = calc_encoded_data_size(char_counts, huffman_table);
-  printf("encoded size: %zu bytes\n", encoded_data_size);
+  size_t encoded_text_size = calc_encoded_text_size(char_counts, huffman_table);
+  printf("encoded size: %zu bytes\n", encoded_text_size);
 
   rewind(fptr);
-  uint8_t *encoded_text = calloc(encoded_data_size, sizeof(*encoded_text));
+  uint8_t *encoded_text = calloc(encoded_text_size, sizeof(*encoded_text));
   encode_text(fptr, encoded_text, huffman_table);
-
-  for (size_t i = 0; i < encoded_data_size; i++) {
-    printf("%x ", encoded_text[i]);
-  }
-  printf("\n");
+  print_encoded_text(encoded_text, encoded_text_size);
 
   free(encoded_text);
   heap_free(&priority_queue);
