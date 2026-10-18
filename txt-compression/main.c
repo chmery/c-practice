@@ -1,6 +1,7 @@
 #include "../binary-tree/heap.h"
 #include <math.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -9,15 +10,15 @@
 #define ASCII_SIZE 128
 
 struct huffman_node {
-  char ascii_code;
+  int ascii_code;
   struct huffman_node *left;
   struct huffman_node *right;
 };
 
 struct huffman_table_item {
-  char ascii_code;
-  char huffman_code;
-  char code_len;
+  int ascii_code;
+  int huffman_code;
+  int code_len;
 };
 
 void print_huffman_code(struct huffman_table_item table_item) {
@@ -35,7 +36,7 @@ void print_huffman_table(struct huffman_table_item table[]) {
       continue;
     }
 
-    printf("idx: %i char: '%c' code: ", i, table[i].ascii_code);
+    printf("'%c': ", table[i].ascii_code);
     print_huffman_code(table[i]);
     printf("\n");
   }
@@ -49,7 +50,7 @@ size_t calc_encoded_data_size(int char_counts[], struct huffman_table_item huffm
       continue;
     }
 
-    bits += (int)huffman_table[i].code_len * char_counts[i];
+    bits += huffman_table[i].code_len * char_counts[i];
   }
 
   return ceilf(bits / 8);
@@ -58,7 +59,7 @@ size_t calc_encoded_data_size(int char_counts[], struct huffman_table_item huffm
 void fill_huffman_table(struct huffman_node *root, struct huffman_table_item table[], int depth, int code) {
   if (root->ascii_code) {
     struct huffman_table_item table_item = {root->ascii_code, code, depth};
-    table[(int)root->ascii_code] = table_item;
+    table[root->ascii_code] = table_item;
   }
 
   if (!root->left && !root->right) {
@@ -129,6 +130,57 @@ void aggregate_char_counts(int char_counts[], FILE *fptr) {
   }
 }
 
+int get_n_last_bits(int n, int value) {
+  int mask = (1 << n) - 1;
+  return value & mask;
+}
+
+void write_code_into_bytes(uint8_t *bytes, int *byte_idx, int *start_bit, int code, int code_len) {
+  int can_fit = code_len <= *start_bit;
+
+  if (can_fit) {
+    uint8_t write_mask = code << (*start_bit - code_len);
+    bytes[*byte_idx] = bytes[*byte_idx] | write_mask;
+
+    int byte_full = *start_bit == code_len;
+    if (byte_full) {
+      *start_bit = 8;
+      (*byte_idx)++;
+    } else {
+      *start_bit = *start_bit - code_len;
+    }
+  } else {
+    // write as much into current byte and apply whats left to the next bytes
+
+    int code_len_left_to_write = code_len - *start_bit;
+    int code_left_to_write = get_n_last_bits(code_len_left_to_write, code);
+
+    uint8_t write_mask = code >> code_len_left_to_write;
+    bytes[*byte_idx] = bytes[*byte_idx] | write_mask;
+
+    *start_bit = 8;
+    (*byte_idx)++;
+
+    write_code_into_bytes(bytes, byte_idx, start_bit, code_left_to_write, code_len_left_to_write);
+  }
+}
+
+void encode_text(FILE *fptr, uint8_t *encoded_text, struct huffman_table_item table[]) {
+  uint8_t buf[CHUNK_SIZE] = {0};
+
+  int byte_idx = 0;
+  int start_bit = 8;
+
+  while (!feof(fptr)) {
+    size_t bytes_read = fread(buf, 1, CHUNK_SIZE, fptr);
+    for (size_t i = 0; i < bytes_read; i++) {
+      int code = table[buf[i]].huffman_code;
+      int code_len = table[buf[i]].code_len;
+      write_code_into_bytes(encoded_text, &byte_idx, &start_bit, code, code_len);
+    }
+  }
+}
+
 struct huffman_node *create_huffman_tree(struct heap *priority_queue) {
   while (priority_queue->len > 1) {
     struct heap_node smallest1 = heap_delete(priority_queue, MIN);
@@ -152,8 +204,7 @@ int main(void) {
 
   if (ferror(fptr)) {
     printf("file error\n");
-  } else {
-    fclose(fptr);
+    return 1;
   }
 
   struct heap_node *queue_nodes = 0;
@@ -167,9 +218,20 @@ int main(void) {
   print_huffman_table(huffman_table);
 
   size_t encoded_data_size = calc_encoded_data_size(char_counts, huffman_table);
-  printf("%zu\n", encoded_data_size);
+  printf("encoded size: %zu bytes\n", encoded_data_size);
 
+  rewind(fptr);
+  uint8_t *encoded_text = calloc(encoded_data_size, sizeof(*encoded_text));
+  encode_text(fptr, encoded_text, huffman_table);
+
+  for (size_t i = 0; i < encoded_data_size; i++) {
+    printf("%x ", encoded_text[i]);
+  }
+  printf("\n");
+
+  free(encoded_text);
   heap_free(&priority_queue);
+  fclose(fptr);
 
   return 0;
 }
