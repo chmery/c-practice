@@ -83,7 +83,6 @@ void heap_insert(struct heap *h, struct heap_node node, enum heap_type ht) {
   sift_up(h, h->len, ht);
 }
 
-/* Caller needs to free returned node's data field.  */
 struct heap_node heap_delete(struct heap *h, enum heap_type ht) {
   struct heap_node deleted_node = h->nodes[1];
 

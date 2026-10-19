@@ -15,7 +15,10 @@ enum heap_type {
 
 struct heap heap_init(struct heap_node nodes[], int len, enum heap_type ht);
 void heap_insert(struct heap *h, struct heap_node node, enum heap_type ht);
+
+/* Caller needs to free returned node's data field.  */
 struct heap_node heap_delete(struct heap *h, enum heap_type ht);
+
 void heap_sort(struct heap *h, enum heap_type ht);
 void heap_print(struct heap *h);
 void heap_free(struct heap *h);
