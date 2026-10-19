@@ -67,10 +67,6 @@ void fill_huffman_table(struct huffman_node *root, struct huffman_table_item tab
   if (root->ascii_code) {
     struct huffman_table_item table_item = {root->ascii_code, code, depth};
     table[root->ascii_code] = table_item;
-  }
-
-  if (!root->left && !root->right) {
-    free(root);
     return;
   }
 
@@ -82,6 +78,21 @@ void fill_huffman_table(struct huffman_node *root, struct huffman_table_item tab
   if (root->right) {
     // add 1 to code
     fill_huffman_table(root->right, table, depth + 1, (code << 1) + 1);
+  }
+}
+
+void free_huffman_tree(struct huffman_node *root) {
+  if (root->ascii_code) {
+    free(root);
+    return;
+  }
+
+  if (root->left) {
+    free_huffman_tree(root->left);
+  }
+
+  if (root->right) {
+    free_huffman_tree(root->right);
   }
 
   free(root);
@@ -219,8 +230,11 @@ int main(void) {
   free(queue_nodes);
 
   struct huffman_node *root_node = create_huffman_tree(&priority_queue);
+  heap_free(&priority_queue);
+
   struct huffman_table_item huffman_table[ASCII_SIZE] = {0};
   fill_huffman_table(root_node, huffman_table, 0, 0);
+  free_huffman_tree(root_node);
   print_huffman_table(huffman_table);
 
   size_t encoded_text_size = calc_encoded_text_size(char_counts, huffman_table);
@@ -232,7 +246,6 @@ int main(void) {
   print_encoded_text(encoded_text, encoded_text_size);
 
   free(encoded_text);
-  heap_free(&priority_queue);
   fclose(fptr);
 
   return 0;
