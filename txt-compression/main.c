@@ -148,6 +148,11 @@ void aggregate_char_counts(int char_counts[], FILE *fptr) {
   }
 }
 
+int read_n_bit(int n, int value) {
+  int mask = 1 << (n - 1);
+  return value & mask;
+}
+
 int get_n_last_bits(int n, int value) {
   int mask = (1 << n) - 1;
   return value & mask;
@@ -197,6 +202,38 @@ void encode_text(FILE *fptr, uint8_t *encoded_text, struct huffman_table_item ta
   }
 }
 
+char *decode_text(struct huffman_node *root_node, uint8_t *encoded_text, size_t encoded_text_size) {
+  struct huffman_node *curr_node = root_node;
+
+  // this is temp solution, it doesnt make sense to hold lets say 2gb of text in memory
+  // chunk should get written into file
+  char *decoded_str = malloc(CHUNK_SIZE);
+  int insert_idx = 0;
+
+  for (size_t i = 0; i < encoded_text_size; i++) {
+    uint8_t byte = encoded_text[i];
+
+    for (int bit_num = 8; bit_num > 0; bit_num--) {
+      if (curr_node->ascii_code) {
+        decoded_str[insert_idx] = curr_node->ascii_code;
+        insert_idx++;
+        curr_node = root_node;
+      }
+
+      int bit = read_n_bit(bit_num, byte);
+
+      if (bit == 0) {
+        curr_node = curr_node->left;
+      } else {
+        curr_node = curr_node->right;
+      }
+    }
+  }
+
+  decoded_str[insert_idx] = 0;
+  return decoded_str;
+}
+
 struct huffman_node *create_huffman_tree(struct heap *priority_queue) {
   while (priority_queue->len > 1) {
     struct heap_node smallest1 = heap_delete(priority_queue, MIN);
@@ -234,7 +271,6 @@ int main(void) {
 
   struct huffman_table_item huffman_table[ASCII_SIZE] = {0};
   fill_huffman_table(root_node, huffman_table, 0, 0);
-  free_huffman_tree(root_node);
   print_huffman_table(huffman_table);
 
   size_t encoded_text_size = calc_encoded_text_size(char_counts, huffman_table);
@@ -245,6 +281,11 @@ int main(void) {
   encode_text(fptr, encoded_text, huffman_table);
   print_encoded_text(encoded_text, encoded_text_size);
 
+  char *decoded_text = decode_text(root_node, encoded_text, encoded_text_size);
+  printf("%s\n", decoded_text);
+
+  free(decoded_text);
+  free_huffman_tree(root_node);
   free(encoded_text);
   fclose(fptr);
 
