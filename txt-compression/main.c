@@ -27,6 +27,18 @@ struct file_header {
   struct huffman_table_item *huffman_table;
 };
 
+struct encoded_size {
+  size_t bytes;
+  uint8_t padding_bits;
+};
+
+struct decoder_state {
+  struct huffman_node *root;
+  struct huffman_node *curr;
+  uint32_t insert_idx;
+  char *output;
+};
+
 void print_huffman_code(struct huffman_table_item table_item) {
   int code_len = table_item.code_len;
   int code = table_item.huffman_code;
@@ -54,11 +66,6 @@ void print_encoded_text(uint8_t *text, size_t size) {
   }
   printf("\n");
 }
-
-struct encoded_size {
-  size_t bytes;
-  uint8_t padding_bits;
-};
 
 struct encoded_size calc_encoded_size(int char_counts[], struct huffman_table_item huffman_table[]) {
   float bits = 0;
@@ -151,7 +158,6 @@ int counts_to_heap_nodes(struct heap_node **nodes, int char_counts[]) {
   return nodes_count;
 }
 
-// TODO: get file size
 void aggregate_char_counts(int char_counts[], FILE *fptr) {
   uint8_t buf[CHUNK_SIZE] = {0};
 
@@ -217,37 +223,39 @@ void encode_text(FILE *fptr, uint8_t *encoded_text, struct huffman_table_item ta
   }
 }
 
-char *decode_text(struct huffman_node *root_node, uint8_t *encoded_text, struct encoded_size es) {
-  struct huffman_node *curr_node = root_node;
+void decode_byte(struct decoder_state *ds, uint8_t byte, int padding_bits) {
+  for (int bit_num = 8; bit_num > padding_bits; bit_num--) {
+    if (ds->curr->ascii_code) {
+      ds->output[ds->insert_idx] = ds->curr->ascii_code;
+      ds->insert_idx++;
+      ds->curr = ds->root;
+    }
 
-  // this is temp solution, it doesnt make sense to hold lets say 2gb of text in memory
-  // chunk should get written into file
-  char *decoded_str = malloc(CHUNK_SIZE);
-  int insert_idx = 0;
+    int bit = read_n_bit(bit_num, byte);
 
-  // handle padding bits here
-  for (size_t i = 0; i < es.bytes; i++) {
-    uint8_t byte = encoded_text[i];
-
-    for (int bit_num = 8; bit_num > 0; bit_num--) {
-      if (curr_node->ascii_code) {
-        decoded_str[insert_idx] = curr_node->ascii_code;
-        insert_idx++;
-        curr_node = root_node;
-      }
-
-      int bit = read_n_bit(bit_num, byte);
-
-      if (bit == 0) {
-        curr_node = curr_node->left;
-      } else {
-        curr_node = curr_node->right;
-      }
+    if (bit == 0) {
+      ds->curr = ds->curr->left;
+    } else {
+      ds->curr = ds->curr->right;
     }
   }
+}
 
-  decoded_str[insert_idx] = 0;
-  return decoded_str;
+// this is temp solution, it doesnt make sense to hold lets say 2gb of text in memory
+// chunk should get written into file straight away
+char *decode_text(struct huffman_node *root_node, uint8_t *encoded_text, struct encoded_size es) {
+  struct decoder_state ds = {root_node, root_node, 0, malloc(CHUNK_SIZE)};
+
+  for (size_t i = 0; i < es.bytes; i++) {
+    uint8_t byte = encoded_text[i];
+    decode_byte(&ds, byte, 0);
+  }
+
+  uint8_t last_byte = encoded_text[es.bytes - 1];
+  decode_byte(&ds, last_byte, es.padding_bits);
+  ds.output[ds.insert_idx] = 0;
+
+  return ds.output;
 }
 
 struct file_header create_file_header(int unique_chars_count, struct encoded_size es,
