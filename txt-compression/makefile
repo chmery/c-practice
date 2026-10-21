@@ -1,6 +1,6 @@
-HEAP_SOURCE = ../binary-tree/heap.c
+SOURCE_FILES = main.c debug.c ../binary-tree/heap.c
 CFLAGS = -Wall -Wextra -pedantic -g
 
-main: main.c $(HEAP_SOURCE)
-	gcc main.c $(HEAP_SOURCE) -lm -o main $(CFLAGS)
+main: $(SOURCE_FILES)
+	gcc $(SOURCE_FILES) -lm -o main $(CFLAGS)
 	./main

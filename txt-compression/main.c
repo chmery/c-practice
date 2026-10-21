@@ -1,71 +1,12 @@
 #include "../binary-tree/heap.h"
+#include "debug.h"
+#include "shared.h"
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
-
-#define CHUNK_SIZE 1024 * 64
-#define ASCII_SIZE 128
-
-struct huffman_node {
-  uint8_t ascii_code;
-  struct huffman_node *left;
-  struct huffman_node *right;
-};
-
-struct huffman_table_item {
-  uint8_t ascii_code;
-  uint8_t code_len;
-  int huffman_code;
-};
-
-struct file_header {
-  uint8_t table_size;
-  uint8_t padding_bits;
-  struct huffman_table_item *huffman_table;
-};
-
-struct encoded_size {
-  size_t bytes;
-  uint8_t padding_bits;
-};
-
-struct decoder_state {
-  struct huffman_node *root;
-  struct huffman_node *curr;
-  uint32_t insert_idx;
-  char *output;
-};
-
-void print_huffman_code(struct huffman_table_item table_item) {
-  int code_len = table_item.code_len;
-  int code = table_item.huffman_code;
-
-  for (int i = 0; i < code_len; i++) {
-    printf("%i", (code >> (code_len - 1 - i)) & 1);
-  }
-}
-
-void print_huffman_table(struct huffman_table_item table[]) {
-  for (int i = 0; i < ASCII_SIZE; i++) {
-    if (!table[i].ascii_code) {
-      continue;
-    }
-
-    printf("'%c': ", table[i].ascii_code);
-    print_huffman_code(table[i]);
-    printf("\n");
-  }
-}
-
-void print_encoded_text(uint8_t *text, size_t size) {
-  for (size_t i = 0; i < size; i++) {
-    printf("%x ", text[i]);
-  }
-  printf("\n");
-}
 
 struct encoded_size calc_encoded_size(int char_counts[], struct huffman_table_item huffman_table[]) {
   float bits = 0;
@@ -321,7 +262,7 @@ int main(void) {
   rewind(fptr);
   uint8_t *encoded_text = calloc(encoded_size.bytes, sizeof(*encoded_text));
   encode_text(fptr, encoded_text, huffman_table);
-  print_encoded_text(encoded_text, encoded_size.bytes);
+  print_encoded_bytes(encoded_text, encoded_size.bytes);
 
   char *decoded_text = decode_text(root_node, encoded_text, encoded_size);
   printf("%s\n", decoded_text);
