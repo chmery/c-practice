@@ -1,4 +1,4 @@
-SOURCE_FILES = main.c debug.c ../binary-tree/heap.c
+SOURCE_FILES = main.c encoder.c debug.c ../binary-tree/heap.c
 CFLAGS = -Wall -Wextra -pedantic -g
 
 main: $(SOURCE_FILES)
