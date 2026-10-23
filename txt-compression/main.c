@@ -48,20 +48,13 @@ char *decode_text(struct huffman_node *root_node, uint8_t *encoded_text, struct 
 }
 
 int main(void) {
-  FILE *fptr = fopen("raw.txt", "rb");
-  uint8_t *encoded_text = encode_ascii_text(fptr);
+  compress_ascii_text("raw.txt", "test");
 
   // char *decoded_text = decode_text(root_node, encoded_text, encoded_size);
   // printf("%s\n", decoded_text);
 
-  // struct file_header fh = create_file_header(unique_chars_count, encoded_size, huffman_table);
-  // printf("ts:%i pb:%i\n", fh.table_size, fh.padding_bits);
-
   // free(fh.huffman_table);
   // free(decoded_text);
   // free_huffman_tree(root_node);
-  free(encoded_text);
-  fclose(fptr);
-
   return 0;
 }

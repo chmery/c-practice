@@ -6,6 +6,8 @@
 
 #define CHUNK_SIZE 1024 * 64
 #define ASCII_SIZE 128
+#define DATA_HEADER_SIZE 5
+#define TABLE_ITEM_SIZE 6
 
 struct huffman_node {
   uint8_t ascii_code;
@@ -19,14 +21,8 @@ struct huffman_table_item {
   int huffman_code;
 };
 
-struct file_header {
-  uint8_t table_size;
-  uint8_t padding_bits;
-  struct huffman_table_item *huffman_table;
-};
-
 struct encoded_size {
-  size_t bytes;
+  uint32_t bytes;
   uint8_t padding_bits;
 };
 

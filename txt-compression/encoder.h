@@ -1,4 +1,4 @@
 #include <stdint.h>
 #include <stdio.h>
 
-uint8_t *encode_ascii_text(FILE *fptr);
+void compress_ascii_text(char *input_path, char *output_path);

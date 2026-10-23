@@ -2,22 +2,25 @@
 #include "debug.h"
 #include "shared.h"
 #include <math.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void aggregate_char_counts(int char_counts[], FILE *fptr) {
   uint8_t buf[CHUNK_SIZE] = {0};
 
   while (!feof(fptr)) {
-    size_t bytes_read = fread(buf, 1, CHUNK_SIZE, fptr);
-    for (size_t i = 0; i < bytes_read; i++) {
+    uint32_t bytes_read = fread(buf, 1, CHUNK_SIZE, fptr);
+    for (uint32_t i = 0; i < bytes_read; i++) {
       char_counts[buf[i]]++;
     }
   }
 }
 
 int counts_to_heap_nodes(struct heap_node **nodes, int char_counts[]) {
-  size_t max_size = ASCII_SIZE * sizeof(struct heap_node);
+  uint32_t max_size = ASCII_SIZE * sizeof(struct heap_node);
   struct heap_node *nodes_ptr = malloc(max_size);
 
   int skipped = 0;
@@ -126,7 +129,7 @@ struct encoded_size calc_encoded_size(int char_counts[], struct huffman_table_it
     bits += huffman_table[i].code_len * char_counts[i];
   }
 
-  size_t bytes = ceilf(bits / 8);
+  uint32_t bytes = ceilf(bits / 8);
   uint8_t padding_bits = bytes * 8 - bits;
   struct encoded_size es = {bytes, padding_bits};
 
@@ -174,8 +177,8 @@ void encode(FILE *fptr, uint8_t *encoded_text, struct huffman_table_item table[]
   int start_bit = 8;
 
   while (!feof(fptr)) {
-    size_t bytes_read = fread(buf, 1, CHUNK_SIZE, fptr);
-    for (size_t i = 0; i < bytes_read; i++) {
+    uint32_t bytes_read = fread(buf, 1, CHUNK_SIZE, fptr);
+    for (uint32_t i = 0; i < bytes_read; i++) {
       int code = table[buf[i]].huffman_code;
       int code_len = table[buf[i]].code_len;
       write_code_into_bytes(encoded_text, &byte_idx, &start_bit, code, code_len);
@@ -183,31 +186,59 @@ void encode(FILE *fptr, uint8_t *encoded_text, struct huffman_table_item table[]
   }
 }
 
-struct file_header create_file_header(int unique_chars_count, struct encoded_size es,
-                                      struct huffman_table_item huffman_table[]) {
-  struct file_header header = {unique_chars_count, es.padding_bits,
-                               malloc(sizeof(struct huffman_table_item) * unique_chars_count)};
+void write_table(FILE *output, struct huffman_table_item huffman_table[]) {
+  size_t max_table_size = TABLE_ITEM_SIZE * ASCII_SIZE;
+  uint8_t *table = malloc(max_table_size);
 
-  int header_table_idx = 0;
+  int insert_idx = 0;
+  uint8_t table_len = 0;
   for (int i = 0; i < ASCII_SIZE; i++) {
     if (!huffman_table[i].ascii_code) {
       continue;
     }
 
-    header.huffman_table[header_table_idx] = huffman_table[i];
-    header_table_idx++;
+    table[insert_idx] = huffman_table[i].ascii_code;
+    insert_idx += 1;
+
+    table[insert_idx] = huffman_table[i].code_len;
+    insert_idx += 1;
+
+    memcpy(&table[insert_idx], &huffman_table[i].huffman_code, sizeof(huffman_table[i].huffman_code));
+    insert_idx += 4;
+
+    table_len++;
   }
 
-  return header;
+  size_t new_size = table_len * TABLE_ITEM_SIZE;
+  uint8_t *new_table_ptr = realloc(table, new_size);
+
+  fwrite(&table_len, 1, 1, output);
+  fwrite(new_table_ptr, new_size, 1, output);
+
+  printf("tl: %u ts: %zu\n", table_len, new_size);
+
+  free(new_table_ptr);
 }
 
-uint8_t *encode_ascii_text(FILE *fptr) {
+void write_data(FILE *output, uint8_t *encoded_text, struct encoded_size es) {
+  uint8_t *header = malloc(DATA_HEADER_SIZE);
+
+  memcpy(header, &es.bytes, sizeof(es.bytes));
+  header[4] = es.padding_bits;
+
+  fwrite(header, DATA_HEADER_SIZE, 1, output);
+  fwrite(encoded_text, es.bytes, 1, output);
+
+  free(header);
+}
+
+void compress_ascii_text(char *input_path, char *output_path) {
+  FILE *input_fptr = fopen(input_path, "rb");
+
   int char_counts[ASCII_SIZE] = {0};
-  aggregate_char_counts(char_counts, fptr);
+  aggregate_char_counts(char_counts, input_fptr);
 
   struct heap priority_queue = create_priority_queue(char_counts);
-  int unique_chars_count = priority_queue.len;
-
   struct huffman_node *root_node = create_huffman_tree(&priority_queue);
   heap_free(&priority_queue);
 
@@ -216,11 +247,18 @@ uint8_t *encode_ascii_text(FILE *fptr) {
   print_huffman_table(huffman_table);
 
   struct encoded_size encoded_size = calc_encoded_size(char_counts, huffman_table);
-  printf("encoded size: %zu bytes\n", encoded_size.bytes);
+  printf("encoded size: %u bytes\n", encoded_size.bytes);
 
   uint8_t *encoded_text = calloc(encoded_size.bytes, sizeof(*encoded_text));
-  encode(fptr, encoded_text, huffman_table);
+  encode(input_fptr, encoded_text, huffman_table);
   print_encoded_bytes(encoded_text, encoded_size.bytes);
 
-  return encoded_text;
+  FILE *output_fptr = fopen(output_path, "w");
+  write_table(output_fptr, huffman_table);
+  write_data(output_fptr, encoded_text, encoded_size);
+
+  free_huffman_tree(root_node);
+  free(encoded_text);
+  fclose(input_fptr);
+  fclose(output_fptr);
 }
