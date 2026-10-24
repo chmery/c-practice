@@ -186,38 +186,30 @@ void encode(FILE *fptr, uint8_t *encoded_text, struct huffman_table_item table[]
   }
 }
 
-void write_table(FILE *output, struct huffman_table_item huffman_table[]) {
-  size_t max_table_size = TABLE_ITEM_SIZE * ASCII_SIZE;
-  uint8_t *table = malloc(max_table_size);
-
-  int insert_idx = 0;
-  uint8_t table_len = 0;
-  for (int i = 0; i < ASCII_SIZE; i++) {
-    if (!huffman_table[i].ascii_code) {
-      continue;
-    }
-
-    table[insert_idx] = huffman_table[i].ascii_code;
-    insert_idx += 1;
-
-    table[insert_idx] = huffman_table[i].code_len;
-    insert_idx += 1;
-
-    memcpy(&table[insert_idx], &huffman_table[i].huffman_code, sizeof(huffman_table[i].huffman_code));
-    insert_idx += 4;
-
-    table_len++;
+void pack_huffman_tree_into_array(struct huffman_node *node, uint8_t *arr, int *idx) {
+  arr[*idx] = node->ascii_code;
+  if (!node->left && !node->right) {
+    return;
   }
 
-  size_t new_size = table_len * TABLE_ITEM_SIZE;
-  uint8_t *new_table_ptr = realloc(table, new_size);
+  (*idx)++;
+  pack_huffman_tree_into_array(node->left, arr, idx);
 
-  fwrite(&table_len, 1, 1, output);
-  fwrite(new_table_ptr, new_size, 1, output);
+  (*idx)++;
+  pack_huffman_tree_into_array(node->right, arr, idx);
+}
 
-  printf("tl: %u ts: %zu\n", table_len, new_size);
+void write_tree(FILE *output, struct huffman_node *root_node, uint8_t nodes_count) {
+  size_t write_size = nodes_count + 1;
+  uint8_t *tree = malloc(write_size);
+  int idx = 0;
 
-  free(new_table_ptr);
+  tree[idx] = nodes_count;
+  idx++;
+
+  pack_huffman_tree_into_array(root_node, tree, &idx);
+  fwrite(tree, write_size, 1, output);
+  free(tree);
 }
 
 void write_data(FILE *output, uint8_t *encoded_text, struct encoded_size es) {
@@ -239,6 +231,8 @@ void compress_ascii_text(char *input_path, char *output_path) {
   aggregate_char_counts(char_counts, input_fptr);
 
   struct heap priority_queue = create_priority_queue(char_counts);
+  int unique_char_counts = priority_queue.len;
+
   struct huffman_node *root_node = create_huffman_tree(&priority_queue);
   heap_free(&priority_queue);
 
@@ -254,7 +248,7 @@ void compress_ascii_text(char *input_path, char *output_path) {
   print_encoded_bytes(encoded_text, encoded_size.bytes);
 
   FILE *output_fptr = fopen(output_path, "w");
-  write_table(output_fptr, huffman_table);
+  write_tree(output_fptr, root_node, unique_char_counts * 2 - 1);
   write_data(output_fptr, encoded_text, encoded_size);
 
   free_huffman_tree(root_node);
