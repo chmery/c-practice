@@ -33,4 +33,6 @@ struct decoder_state {
   char *output;
 };
 
+void free_huffman_tree(struct huffman_node *root);
+
 #endif

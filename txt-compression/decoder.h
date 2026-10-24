@@ -1,0 +1,1 @@
+void decode_ascii_text(char *input_path, char *output_path);

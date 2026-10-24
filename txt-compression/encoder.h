@@ -1,4 +1,1 @@
-#include <stdint.h>
-#include <stdio.h>
-
 void compress_ascii_text(char *input_path, char *output_path);
