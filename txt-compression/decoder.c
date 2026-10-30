@@ -3,6 +3,46 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void create_subtree(struct huffman_node *n, uint8_t *nodes_arr, int *idx) {
+  n->ascii_code = nodes_arr[*idx];
+  if (n->ascii_code) {
+    return;
+  }
+
+  (*idx)++;
+  n->left = malloc(sizeof(*n->left));
+  create_subtree(n->left, nodes_arr, idx);
+
+  (*idx)++;
+  n->right = malloc(sizeof(*n->right));
+  create_subtree(n->right, nodes_arr, idx);
+}
+
+struct huffman_node *recreate_huffman_tree(FILE *fptr) {
+  uint8_t nodes_count = 0;
+  fread(&nodes_count, 1, 1, fptr);
+
+  uint8_t *nodes_arr = malloc(nodes_count);
+  fread(nodes_arr, nodes_count, 1, fptr);
+
+  struct huffman_node *root = calloc(1, sizeof(*root));
+  int idx = 0;
+
+  create_subtree(root, nodes_arr, &idx);
+  free(nodes_arr);
+
+  return root;
+}
+
+struct encoded_size get_encoded_size(FILE *fptr) {
+  struct encoded_size es = {0};
+  uint32_t buf[2] = {0};
+  fread(buf, DATA_HEADER_SIZE, 1, fptr);
+  es.bytes = buf[0];
+  es.padding_bits = buf[1];
+  return es;
+}
+
 int read_n_bit(int n, int value) {
   int mask = 1 << (n - 1);
   return value & mask;
@@ -26,30 +66,6 @@ void decode_byte(struct decoder_state *ds, uint8_t byte, int padding_bits) {
   }
 }
 
-// TODO: gib better name
-void add_tree_node(struct huffman_node *n, uint8_t *tree_arr, int *idx) {
-  n->ascii_code = tree_arr[*idx];
-  if (n->ascii_code) {
-    return;
-  }
-
-  (*idx)++;
-  n->left = malloc(sizeof(struct huffman_node));
-  add_tree_node(n->left, tree_arr, idx);
-
-  (*idx)++;
-  n->right = malloc(sizeof(struct huffman_node));
-  add_tree_node(n->right, tree_arr, idx);
-}
-
-struct huffman_node *recreate_huffman_tree(uint8_t *tree_arr) {
-  struct huffman_node *root = calloc(1, sizeof(*root));
-  int idx = 0;
-
-  add_tree_node(root, tree_arr, &idx);
-  return root;
-}
-
 // this is temp solution, it doesnt make sense to hold lets say 2gb of text in memory
 // chunk should get written into file straight away
 char *decode_text(struct huffman_node *root_node, uint8_t *encoded_text, struct encoded_size es) {
@@ -70,19 +86,8 @@ char *decode_text(struct huffman_node *root_node, uint8_t *encoded_text, struct 
 void decode_ascii_text(char *input_path, char *output_path) {
   FILE *input_fptr = fopen(input_path, "rb");
 
-  uint8_t tree_nodes_count = 0;
-  fread(&tree_nodes_count, 1, 1, input_fptr);
-
-  uint8_t *tree_nodes_arr = malloc(tree_nodes_count);
-  fread(tree_nodes_arr, tree_nodes_count, 1, input_fptr);
-  struct huffman_node *root_node = recreate_huffman_tree(tree_nodes_arr);
-  free(tree_nodes_arr);
-
-  struct encoded_size es = {0};
-  uint32_t es_buf[2] = {0};
-  fread(es_buf, DATA_HEADER_SIZE, 1, input_fptr);
-  es.bytes = es_buf[0];
-  es.padding_bits = es_buf[1];
+  struct huffman_node *root_node = recreate_huffman_tree(input_fptr);
+  struct encoded_size es = get_encoded_size(input_fptr);
 
   uint8_t *encoded_buf = malloc(CHUNK_SIZE);
   fread(encoded_buf, CHUNK_SIZE, 1, input_fptr);
