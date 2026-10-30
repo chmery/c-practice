@@ -1,7 +1,22 @@
 #include "shared.h"
+#include <math.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+struct encoded_chunk {
+  uint8_t *data;
+  size_t size;
+};
+
+struct decoder_state {
+  struct huffman_node *root;
+  struct huffman_node *curr;
+  uint32_t insert_idx;
+  uint32_t output_size;
+  char *output;
+};
 
 void create_subtree(struct huffman_node *n, uint8_t *nodes_arr, int *idx) {
   n->ascii_code = nodes_arr[*idx];
@@ -62,25 +77,44 @@ void decode_byte(struct decoder_state *ds, uint8_t byte, int padding_bits) {
       ds->output[ds->insert_idx] = ds->curr->ascii_code;
       ds->insert_idx++;
       ds->curr = ds->root;
+      ds->output_size++;
     }
   }
 }
 
-// this is temp solution, it doesnt make sense to hold lets say 2gb of text in memory
-// chunk should get written into file straight away
-char *decode_text(struct huffman_node *root_node, uint8_t *encoded_text, struct encoded_size es) {
-  struct decoder_state ds = {root_node, root_node, 0, malloc(CHUNK_SIZE)};
+void decode_chunk(struct decoder_state *ds, struct encoded_chunk *ec, struct encoded_size *es) {
+  uint8_t is_last_chunk = ec->size < CHUNK_SIZE;
 
-  for (size_t i = 0; i < es.bytes - 1; i++) {
-    uint8_t byte = encoded_text[i];
-    decode_byte(&ds, byte, 0);
+  for (size_t i = 0; i < (is_last_chunk ? ec->size - 1 : ec->size); i++) {
+    uint8_t byte = ec->data[i];
+    decode_byte(ds, byte, 0);
   }
 
-  uint8_t last_byte = encoded_text[es.bytes - 1];
-  decode_byte(&ds, last_byte, es.padding_bits);
-  ds.output[ds.insert_idx] = 0;
+  if (is_last_chunk) {
+    uint8_t last_byte = ec->data[ec->size - 1];
+    decode_byte(ds, last_byte, es->padding_bits);
+    ds->output[ds->insert_idx] = 0;
+  }
+}
 
-  return ds.output;
+void write_decoded_text(FILE *input_fptr, char *output_path, struct huffman_node *root_node, struct encoded_size *es) {
+  FILE *output_fptr = fopen(output_path, "w");
+
+  struct decoder_state ds = {root_node, root_node, 0, 0, malloc(CHUNK_SIZE)};
+  struct encoded_chunk ec = {malloc(CHUNK_SIZE), 0};
+  int chunks_count = ceil((double)es->bytes / CHUNK_SIZE);
+
+  for (int i = 0; i < chunks_count; i++) {
+    ds.output_size = 0;
+    ds.insert_idx = 0;
+    ec.size = fread(ec.data, 1, CHUNK_SIZE, input_fptr);
+    decode_chunk(&ds, &ec, es);
+    fwrite(ds.output, ds.output_size, 1, output_fptr);
+  }
+
+  fclose(output_fptr);
+  free(ds.output);
+  free(ec.data);
 }
 
 void decode_ascii_text(char *input_path, char *output_path) {
@@ -89,13 +123,8 @@ void decode_ascii_text(char *input_path, char *output_path) {
   struct huffman_node *root_node = recreate_huffman_tree(input_fptr);
   struct encoded_size es = get_encoded_size(input_fptr);
 
-  uint8_t *encoded_buf = malloc(CHUNK_SIZE);
-  fread(encoded_buf, CHUNK_SIZE, 1, input_fptr);
-  char *str = decode_text(root_node, encoded_buf, es);
-  printf("%s\n", str);
+  write_decoded_text(input_fptr, output_path, root_node, &es);
 
   fclose(input_fptr);
-  free(encoded_buf);
-  free(str);
   free_huffman_tree(root_node);
 }

@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define CHUNK_SIZE 1024 * 64
+#define CHUNK_SIZE 65536 // 1024 * 64
 #define ASCII_SIZE 128
 #define DATA_HEADER_SIZE 5
 #define TABLE_ITEM_SIZE 6
@@ -24,13 +24,6 @@ struct huffman_table_item {
 struct encoded_size {
   uint32_t bytes;
   uint8_t padding_bits;
-};
-
-struct decoder_state {
-  struct huffman_node *root;
-  struct huffman_node *curr;
-  uint32_t insert_idx;
-  char *output;
 };
 
 void free_huffman_tree(struct huffman_node *root);
