@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define CHUNK_SIZE 65536 // 1024 * 64
+#define CHUNK_SIZE 8192
 #define ASCII_SIZE 128
 #define DATA_HEADER_SIZE 5
 #define TABLE_ITEM_SIZE 6

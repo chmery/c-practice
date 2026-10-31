@@ -100,13 +100,14 @@ void decode_chunk(struct decoder_state *ds, struct encoded_chunk *ec, struct enc
 void write_decoded_text(FILE *input_fptr, char *output_path, struct huffman_node *root_node, struct encoded_size *es) {
   FILE *output_fptr = fopen(output_path, "w");
 
-  struct decoder_state ds = {root_node, root_node, 0, 0, malloc(CHUNK_SIZE)};
+  size_t max_decoded_output_size = CHUNK_SIZE * 8; // when every char is encoded as 1 bit
+  struct decoder_state ds = {root_node, root_node, 0, 0, malloc(max_decoded_output_size)};
   struct encoded_chunk ec = {malloc(CHUNK_SIZE), 0};
   int chunks_count = ceil((double)es->bytes / CHUNK_SIZE);
 
   for (int i = 0; i < chunks_count; i++) {
-    ds.output_size = 0;
     ds.insert_idx = 0;
+    ds.output_size = 0;
     ec.size = fread(ec.data, 1, CHUNK_SIZE, input_fptr);
     decode_chunk(&ds, &ec, es);
     fwrite(ds.output, ds.output_size, 1, output_fptr);
