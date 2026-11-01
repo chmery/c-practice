@@ -221,14 +221,14 @@ void compress_ascii_text(char *input_path, char *output_path) {
 
   struct huffman_table_item huffman_table[ASCII_SIZE] = {0};
   fill_huffman_table(root_node, huffman_table, 0, 0);
-  print_huffman_table(huffman_table);
+  // print_huffman_table(huffman_table);
 
   struct encoded_size encoded_size = calc_encoded_size(char_counts, huffman_table);
-  printf("encoded size: %u bytes\n", encoded_size.bytes);
+  // printf("encoded size: %u bytes\n", encoded_size.bytes);
 
   uint8_t *encoded_text = calloc(encoded_size.bytes, sizeof(*encoded_text));
   encode(input_fptr, encoded_text, huffman_table);
-  print_encoded_bytes(encoded_text, encoded_size.bytes);
+  // print_encoded_bytes(encoded_text, encoded_size.bytes);
 
   FILE *output_fptr = fopen(output_path, "w");
   write_tree(output_fptr, root_node, unique_char_counts * 2 - 1);
